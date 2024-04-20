@@ -1,0 +1,50 @@
+UI
+-------------------------------------------------------------
+[T]        : Resets the time to 0
+[+]        : Makes a new art piece
+[]        : Stop Rendering
+[save]     : Saves the current art (Ctrl-S / Cmd-S)
+[mode]     : POINTS, LINES, LINE_STRIP, LINE_LOOP, etc...
+[NATIVE]   : Lines are native size (1 pixel) or CSS size
+           : On HD-DPI display CSS will generate thicker lines
+[sound]    : A soundcloud URL for music/playlist.
+           : The URL must have permission to embedded/stream
+           : Blank = off, mic = mic, feedback = mic + speaker
+[lock]     : Prevent music changing when switching art
+[yourname] : Shows your creations (or sign in).
+[name]     : Shows all revisions of current art
+[username] : Shows all user's creations
+[♥]        : “Like” current art
+
+Inputs
+-------------------------------------------------------------
+vertexId    : float     : number of the vertex 0, 1, 2
+vertexCount : float     : total number of vertices
+resolution  : vec2      : resolution of the art
+mouse       : vec2      : mouse position normalized (-1 to 1)
+touch       : sampler2D : touch history 32x240 (4sec @60fps)
+            :           : x = x, y = y, z = pressure, w = time
+            :           : column 0 is mouse or first finger.
+            :           : column 1 is second finger ...
+time        : float     : time in seconds
+volume      : sampler2D : volume for music 1x240 alpha only
+sound       : sampler2D : data from the music Nx240, alpha only
+            :           : 240 rows of history (4secs @60fps)
+floatSound  : sampler2D : data from the music Nx240, alpha only
+            :           : 240 rows of history (4secs @60fps)
+            :           : see spec for difference between
+            :           : getFloatFrequencyData and
+            :           : getByteFrenquencyData.
+soundRes    : vec2      : resolution of sound
+background  : vec4      : background color
+
+Outputs:
+-------------------------------------------------------------
+gl_Position : vec4    : standard GLSL vertex shader output
+v_color     : vec4    : color to output from fragment shader
+
+BLEND is enabled, function is ONE,ONE_MINUS_SRC_ALPHA,
+DEPTH_TEST is enabled.
+
+https://github.com/greggman/vertexshaderart
+
