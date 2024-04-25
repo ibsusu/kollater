@@ -5,7 +5,7 @@ import { isSafari } from "./utils";
 import CoreWebWorker from './worker?worker';
 import { filer } from "./fileStore";
 import { useEffect, useState } from "preact/hooks";
-// import { comm } from "./communicator";
+import { comm } from "./communicator";
 
 let workerReady = false;
 let initializedEvent = new Event('initialized');

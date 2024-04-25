@@ -2,7 +2,8 @@ import Peer, {Instance as SimplePeerInstance} from 'simple-peer';
 import {sleep} from './utils';
 import {v4 as uuidv4} from 'uuid';
 
-const WS_URL = "wss://kollator.com";
+const WS_URL = "wss://"+ import.meta.env.BASE_URL
+console.log({WS_URL});
 interface RegistrationData {
   success: boolean;
   id: string;
@@ -160,5 +161,4 @@ class Communicator {
 
 let comm = new Communicator();
 
-export {comm}
-
+export {comm};
