@@ -165,12 +165,12 @@ class CoreWorker {
     let key = crypto.getRandomValues(new Uint8Array(16));
     // let iv = crypto.getRandomValues(new Uint8Array(16));
     let keyEncoded = await crypto.subtle.importKey('raw', key.buffer, {
-        name: 'AES-CTR'
+        name: 'AES-GCM'
     }, true, ['encrypt', 'decrypt']);
     let exportedKey = await crypto.subtle.exportKey('raw', keyEncoded);
 
     for await (const chunk of this.streamFileInChunks(file, chunkLength)) {
-        // const cipherText = await crypto.subtle.encrypt({name: 'AES-CTR',counter: iv, length: 128}, keyEncoded, chunk);
+        // const cipherText = await crypto.subtle.encrypt({name: 'AES-GCM',counter: iv, length: 128}, keyEncoded, chunk);
         // const cipherArray = new Uint8Array(cipherText);
         // Hash the chunk with SHA-1 and SHA-256 using the Web Crypto API
         const sha1Hash = await crypto.subtle.digest('SHA-1', chunk);
@@ -190,8 +190,9 @@ class CoreWorker {
       }
     }
 
-    //@ts-ignore
-    let rootHash = flatMerkleStrings.at(-1);
+
+    let rootHash = flatMerkleStrings.at(-1) ?? '';
+    if(!rootHash.length) console.warn("there was no hash generated for the processed file:", file.name ?? Error("no file name"));
 
     let metadata = this.createTorrentMetaData(file.name, file.size, sha1String, flatMerkleStrings);
     await this.writeFileAndTorrent(directory, rootHash, file, metadata);

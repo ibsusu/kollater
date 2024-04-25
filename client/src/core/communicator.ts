@@ -87,6 +87,7 @@ class Communicator {
           case 'ahoy':
             // the server has accepted us, let's wrap up the bootstrap
             this.finishBootstrap();
+            break;
           default:
             return;
         }
