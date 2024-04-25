@@ -57,6 +57,7 @@ async function clearDirectory(directoryHandle: FileSystemDirectoryHandle) {
       }
   }
 }
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 //@ts-ignore
 window.destroyDB = destroyDB;

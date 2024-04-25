@@ -5,6 +5,7 @@ import { isSafari } from "./utils";
 import CoreWebWorker from './worker?worker';
 import { filer } from "./fileStore";
 import { useEffect, useState } from "preact/hooks";
+import { comm } from "./communicator";
 
 let workerReady = false;
 let initializedEvent = new Event('initialized');
@@ -83,7 +84,9 @@ export async function init() {
   await (workManager as unknown as WorkManager).init();
   console.log("workmanager properties", Object.getOwnPropertyNames(workManager));
   // await workManager.hashToString(new Uint8Array([0]));
+
   await filer.init((workManager as CoreWorker));
+
   window.dispatchEvent(initializedEvent);
 }
 
