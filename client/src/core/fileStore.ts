@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Database, MetaData } from './fileTypes';
 import {type CoreWorker } from './core';
-
+import { comms } from './comms';
 
 const eventNames = [
   'stagedFiles',
@@ -89,11 +89,14 @@ export class Filer {
     this.db.files.set(metaData.hash, metaData);    
     await this.save();
     this.dispatch('importedFile');
+    
   }
 
 
   async uploadFile(fileHash: string) {
     console.log({fileHash});
+    // get the torrent data, do some funny crypto stuff
+    // send it to a peer who then sends it to s3
   }
 
   async exportFile(fileHash: string){
