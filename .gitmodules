@@ -1,0 +1,3 @@
+[submodule "segfaultish/node-datachannel"]
+	path = segfaultish/node-datachannel
+	url = https://github.com/murat-dogan/node-datachannel.git

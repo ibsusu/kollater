@@ -17,12 +17,17 @@ export default class _RTCDtlsTransport extends EventTarget {
 
         // forward peerConnection events
         this.#pc.addEventListener('connectionstatechange', () => {
+            console.log("***transport dtls connectionstatechange");
+
             this.dispatchEvent(new Event('statechange'));
         });
 
         // forward events to properties
         this.addEventListener('statechange', (e) => {
+            console.log("***transport dtls statechange");
             if (this.onstatechange) this.onstatechange(e);
+            console.log("***after transport dtls statechange");
+
         });
     }
 

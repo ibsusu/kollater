@@ -16,12 +16,15 @@ export default class _RTCSctpTransport extends EventTarget {
 
         // forward peerConnection events
         this.#pc.addEventListener('connectionstatechange', () => {
+            console.log("***transport connectionstatechange");
             this.dispatchEvent(new Event('statechange'));
         });
 
         // forward events to properties
         this.addEventListener('statechange', (e) => {
+            console.log("***sctp transport statechange");
             if (this.onstatechange) this.onstatechange(e);
+            console.log("***after sctp transport statechange");
         });
     }
 

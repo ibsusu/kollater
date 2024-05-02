@@ -1,8 +1,13 @@
+//@ts-ignore
+import global from 'global';
+import * as process from "process";
+global.process = process;
 import Peer, {Instance as SimplePeerInstance} from 'simple-peer';
-import {sleep} from './utils';
+import { sleep } from './utils';
 import {v4 as uuidv4} from 'uuid';
 
-const WS_URL = "wss://"+ import.meta.env.BASE_URL
+console.log("commsworker!!", import.meta.env);
+const WS_URL = "wss://"+ (import.meta.env.DEV ? 'kollator.local:8000' : 'kollator.com');
 console.log({WS_URL});
 interface RegistrationData {
   success: boolean;
@@ -17,7 +22,9 @@ type PeerIdInstance = SimplePeerInstance & {id: string};
 //   console.log({eventData: event.data});
 // });
 
-class Communicator {
+const decoder = new TextDecoder(); // bytes -> string
+
+class CommsWorker {
   hub!: PeerIdInstance;
   ws?: WebSocket;
   peers: PeerIdInstance[];
@@ -44,7 +51,8 @@ class Communicator {
     });
 
     peer.on('data', (msg) => {
-        let data = JSON.parse(msg);
+      let data = JSON.parse(decoder.decode(msg, {stream: false}));
+      console.log("received data", data);
         switch(data.reason){
           case 'ahoy':
             console.log("received ahoy");
@@ -57,35 +65,40 @@ class Communicator {
   }
 
   async handleRegister(data: RegistrationData) {
+    console.log("handleregister");
     if(data.success === true) {
-      // console.log("success", {data});
+      console.log("success", {data});
       //@ts-ignore
-      this.hub = new Peer({initiator: true});
+      this.hub = new Peer({initiator: true, trickle: true});
       this.hub.id = data.id;
       
       this.hub.on('signal', (data) => {
         console.log("onsignal");
-        if(!this.ws || this.ws.CLOSED || this.ws.CLOSING) {
-          this.hub.destroy();
+        //@ts-ignore
+        // if (data.renegotiate || data.transceiverRequest) {
+        //   console.log("reneg or trans", {data});
+        //   return;
+        // }
+        if(!this.ws || this.ws.readyState > 1) {
+          console.log("ws isn't ready from peer onsignal");
+          // console.trace("destroying hub", this.ws, this.ws?.readyState);
+          // this.hub.destroy();
           return;
         }
-        this.ws.send(JSON.stringify({ reason:'signal', iceData: data, worker: true}));
+        this.ws.send(JSON.stringify({reason:'signal', iceData: data}));
       });
   
       this.hub.on('connect', () => {
         console.log("onconnect");
-        if(!this.ws || this.ws.CLOSED || this.ws.CLOSING) {
-          this.hub.destroy();
-          return;
-        }
-        this.ws.send(JSON.stringify({reason: "ahoy"}));
+        if(this.ws?.readyState === WebSocket.OPEN) this.ws?.send(JSON.stringify({reason: "ahoy"}));
       });
   
       this.hub.on('data', (msg) => {
-        // console.log("ondata");
+        console.log("ondata", msg);
         let data = JSON.parse(msg);
         switch(data.reason){
           case 'ahoy':
+            console.log("data reason was ahoy but I surely didn't decode the data");
             // the server has accepted us, let's wrap up the bootstrap
             this.finishBootstrap();
             break;
@@ -93,43 +106,53 @@ class Communicator {
             return;
         }
       });
+
+      console.log("created peer, ")
     }
     else{
       await sleep(1000 + (2000*(this.bootstrapAttempts-1)));
       if(this.bootstrapAttempts < 5){
         this.id = uuidv4();
+        this.bootstrapAttempts++;
         if(!this.ws || this.ws.CLOSED || this.ws.CLOSING) {
           this.ws = this.bootstrap();
         }
-        this.ws.send(JSON.stringify({reason: "register", id: this.id}));
+        this.ws.send(JSON.stringify({reason: "register", id: this.id, worker: true}));
       }
     }
   }
 
   bootstrap(): WebSocket {
+    console.log("bootstrapping");
     let ws = new WebSocket(WS_URL);
-  
+    console.log("after ws instantiation", WS_URL, ws);
+    //@ts-ignore
+    window.ws = ws;
     ws.onclose = () => {
-      // console.log("websocket closed");
-      setInterval(() => {
-        // if we're ever not connected to someone then we need to bootstrap ourselves.
-        if(this.peers.length === 0 && (!this.hub || this.hub.closed)) {
-          this.hub?.destroy();
-          this.ws?.close();
-          this.bootstrap();
-        }
-      }, 5000);
+      console.log("websocket closed");
+      // setInterval(() => {
+      //   // if we're ever not connected to someone then we need to bootstrap ourselves.
+      //   if(this.peers.length === 0 && (!this.hub || this.hub?.closed)) {
+      //     console.log("destroying hub", this.peers.length, this.hub, this.hub?.closed);
+      //     this.hub?.destroy();
+      //     this.ws?.close();
+      //     if(this.bootstrapAttempts < 5){
+      //       this.bootstrapAttempts++;
+      //       this.bootstrap();
+      //     }
+      //   }
+      // }, 5000);
     }
   
     ws.onopen = () => {
-        // console.log("opened websocket connection");
+        console.log("opened websocket connection");
         ws.send(JSON.stringify({reason: "register", id: this.id}));
         this.bootstrapAttempts++;
     }
   
     //@ts-ignore
     ws.onmessage = ({data} = (ev as MessageEvent)) => {
-        // console.log({data});
+        console.log({data});
         let msgData = JSON.parse(data);
         switch(msgData.reason){
             case 'register':
@@ -142,23 +165,35 @@ class Communicator {
                 return;
         }
     }
+    console.log("after creation of websocket in bootstrap");
 
     return ws;
   }
 
   async handleSignal(data: SignalMessage) {
-    // console.log("handleSignal", {data});
+    console.log("handleSignal", {data});
     this.hub.signal(data.iceData);
   }
 
   finishBootstrap(){
+    console.log("finished bootstrapping webrtc connection");
     // this.peers.push(peer); 
     // this.hub is now being used instead of this.ws
+
     this.ws?.close();
+    setInterval(() => {this.hub.send(JSON.stringify({reason: "ahoy"})) }, 1000);
+
   }
-
+  test() {
+    console.log("commsworker test");
+  }
 }
+console.log("before new commsworker");
+let comms = new CommsWorker();
 
-let comm = new Communicator();
+console.log("after new commsworker");
 
-export {comm};
+export {comms};
+export {CommsWorker};
+//@ts-ignore
+window.comms = comms;

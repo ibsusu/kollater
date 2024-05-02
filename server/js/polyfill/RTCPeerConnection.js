@@ -61,28 +61,49 @@ export default class _RTCPeerConnection extends EventTarget {
 
         // forward peerConnection events
         this.#peerConnection.onStateChange(() => {
+            console.log("---State");
+            console.log("state:", this.#peerConnection.state())
+            if(this.#peerConnection.state() === 'closed'){
+                console.log("state is closed, explicitly calling close");
+                this.close();
+                return;
+            }
             this.dispatchEvent(new Event('connectionstatechange'));
         });
 
         this.#peerConnection.onIceStateChange(() => {
+            console.log("---ICE");
+            console.log("state:", this.#peerConnection.state())
+            if(this.#peerConnection.state() === 'closed'){
+                console.log("state is closed, explicitly calling close");
+                this.close();
+                return;
+            }
             this.dispatchEvent(new Event('iceconnectionstatechange'));
         });
 
         this.#peerConnection.onSignalingStateChange(() => {
+            console.log("---Signaling");
             this.dispatchEvent(new Event('signalingstatechange'));
         });
 
         this.#peerConnection.onGatheringStateChange(() => {
+            console.log("---Gathering");
+
             this.dispatchEvent(new Event('icegatheringstatechange'));
         });
 
         this.#peerConnection.onDataChannel((channel) => {
+            console.log("---DataChannel");
+
             const dataChannel = new RTCDataChannel(channel);
             this.#dataChannels.add(dataChannel);
             this.dispatchEvent(new RTCDataChannelEvent(dataChannel));
         });
 
         this.#peerConnection.onLocalDescription((sdp, type) => {
+            console.log("---Description");
+
             if (type === 'offer') {
                 this.#localOffer.resolve({ sdp, type });
             }
@@ -93,6 +114,7 @@ export default class _RTCPeerConnection extends EventTarget {
         });
 
         this.#peerConnection.onLocalCandidate((candidate, sdpMid) => {
+            console.log("---Candidate");
             if (sdpMid === 'unspec') {
                 this.#localAnswer.reject(new Error(`Invalid description type ${sdpMid}`));
                 return;
@@ -104,22 +126,39 @@ export default class _RTCPeerConnection extends EventTarget {
 
         // forward events to properties
         this.addEventListener('connectionstatechange', (e) => {
+            //theirs
             if (this.onconnectionstatechange) this.onconnectionstatechange(e);
+
+            //mine
+            console.log("STATE_CHANGE", {e}, this.connectionState);
+            if(this.connectionState === 'closed') {
+                console.log("connection state closed after state change");
+            }
         });
         this.addEventListener('signalingstatechange', (e) => {
+            console.log("***signaling");
             if (this.onsignalingstatechange) this.onsignalingstatechange(e);
+            console.log("after signaling");
         });
         this.addEventListener('iceconnectionstatechange', (e) => {
+            console.log("***iceconnection");
             if (this.oniceconnectionstatechange) this.oniceconnectionstatechange(e);
+            console.log("after iceconnection");
         });
         this.addEventListener('icegatheringstatechange', (e) => {
+            console.log("***icegathering");
             if (this.onicegatheringstatechange) this.onicegatheringstatechange(e);
+            console.log("after icegathering");
         });
         this.addEventListener('datachannel', (e) => {
+            console.log("***datachannel");
             if (this.ondatachannel) this.ondatachannel(e);
+            console.log("after datachannel")
         });
         this.addEventListener('icecandidate', (e) => {
+            console.log("***icecandidate");
             if (this.onicecandidate) this.onicecandidate(e);
+            console.log("after icecandidate");
         });
 
         this.#sctp = new RTCSctpTransport({

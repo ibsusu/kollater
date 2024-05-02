@@ -32,7 +32,7 @@ FetchContent_Declare(
     GIT_TAG "v0.20.2"
 )
 
-option(NO_MEDIA "Disable media transport support in libdatachannel" OFF)
+option(NO_MEDIA "Disable media transport support in libdatachannel" ON)
 option(NO_WEBSOCKET "Disable WebSocket support in libdatachannel" OFF)
 
 FetchContent_GetProperties(libdatachannel)

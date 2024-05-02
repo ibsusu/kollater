@@ -1,18 +1,29 @@
 import { defineConfig } from 'vite'
 import preact from '@preact/preset-vite'
-import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [preact(), basicSsl()],
+  plugins: [preact()],
   worker: {
     format: 'es',
   },
   build: {
     target: "ES2022"
   },
+  define: {
+    global: "self",
+  },
+  resolve: {
+    alias: {
+      "readable-stream": "vite-compatible-readable-stream"
+    },
+  },
   server: {
     port: 5173,
-    host: 'kollator.local'
+    host: 'kollator.local',
+    https: {
+      cert: '../certs/_wildcard.kollator.local+3.pem',
+      key: '../certs/_wildcard.kollator.local+3-key.pem'
+    }
   }
 })

@@ -26,7 +26,10 @@ export default class _RTCIceTransport extends EventTarget {
             if (this.ongatheringstatechange) this.ongatheringstatechange(e);
         });
         this.addEventListener('statechange', (e) => {
+            console.log("***icetransport statechange");
             if (this.onstatechange) this.onstatechange(e);
+            console.log("***after icetransport statechange");
+
         });
     }
 
