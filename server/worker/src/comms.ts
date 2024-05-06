@@ -1,15 +1,14 @@
+//@ts-ignore
+import global from 'global';
+import * as process from "process";
+global.process = process;
 import Peer, {type Instance as SimplePeerInstance} from 'simple-peer';
 import { sleep } from './src/utils';
 import {v4 as uuidv4} from 'uuid';
-import https from 'node:https';
 
 console.log("commsworker!!", process.env.KOLLATOR_DOMAIN);
 const WS_URL = "wss://"+ (process.env.KOLLATOR_DOMAIN);
-
 console.log({WS_URL});
-let testOutput = await ((await fetch('https://'+process.env.KOLLATOR_DOMAIN+'/join', { tls: { rejectUnauthorized: false } })).text());
-console.log({testOutput});
-
 interface RegistrationData {
   success: boolean;
   id: string;
@@ -114,19 +113,13 @@ class CommsWorker {
     }
   }
 
-  bootstrap(): WS {
+  bootstrap(): WebSocket {
     console.log("bootstrapping");
-    let ws = new WebSocket(WS_URL, { tls: { rejectUnauthorized: false } });
-    setInterval(() => {
-      console.log("ws and state:", ws, ws.readyState);
-    }, 5000);
+    let ws = new WebSocket(WS_URL);
     console.log("after ws instantiation", WS_URL, ws);
-    ws.addEventListener('error', (e: any) => {
-      console.error("websocket error occurred", e);
-    });
 
-    ws.addEventListener('close',(ev: any) => {
-      console.log("websocket closed", ev.reason, ev.code);
+    ws.onclose = () => {
+      console.log("websocket closed");
       // setInterval(() => {
       //   // if we're ever not connected to someone then we need to bootstrap ourselves.
       //   if(this.peers.length === 0 && (!this.hub || this.hub?.closed)) {
@@ -139,31 +132,30 @@ class CommsWorker {
       //     }
       //   }
       // }, 5000);
-    });
+    }
   
-    ws.addEventListener('open', () => {
-      console.log("opened websocket connection");
-      ws.send(JSON.stringify({reason: "register", id: this.id}));
-      this.bootstrapAttempts++;
-    });
+    ws.onopen = () => {
+        console.log("opened websocket connection");
+        ws.send(JSON.stringify({reason: "register", id: this.id}));
+        this.bootstrapAttempts++;
+    }
   
     //@ts-ignore
-    ws.addEventListener('message', ({data} = (ev as MessageEvent)) => {
-      console.log({data});
-      let msgData = JSON.parse(data);
-      switch(msgData.reason){
-        case 'register':
-          this.handleRegister(msgData as RegistrationData);
-          break;
-        case 'signal':
-          this.handleSignal(msgData as SignalMessage);
-          break;
-        default:
-          return;
-      }
-    });
+    ws.onmessage = ({data} = (ev as MessageEvent)) => {
+        console.log({data});
+        let msgData = JSON.parse(data);
+        switch(msgData.reason){
+            case 'register':
+              this.handleRegister(msgData as RegistrationData);
+              break;
+            case 'signal':
+              this.handleSignal(msgData as SignalMessage);
+              break;
+            default:
+                return;
+        }
+    }
     console.log("after creation of websocket in bootstrap");
-
 
     return ws;
   }
@@ -182,32 +174,18 @@ class CommsWorker {
     console.log("commsworker test");
   }
 }
+console.log("before new commsworker");
+let comms = new CommsWorker();
 
-// console.log("before new commsworker");
-// let comms = new CommsWorker();
-class KWorker {
-  comms: CommsWorker;
-  runPromise: Promise<any>;
-  runResolver!: (value: any) => void;
+// console.log("after new commsworker");
 
-  constructor(){
-    console.log("new KWorker");
-    this.comms = new CommsWorker();
-    this.runPromise = new Promise(res => {
-      this.runResolver = res;
-    });
-  }
-
-  run(){
-    return this.runPromise;
-  }
-
-}
+// export {comms};
+// export {CommsWorker};
+// //@ts-ignore
+// window.comms = comms;
 
 async function main() {
-  let mainWorker = new KWorker();
-
-  await mainWorker.run();
+  await comms.start()
 }
 
-await main();
+main();

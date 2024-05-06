@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { randomUUID, type UUID } from "crypto";
 import { Queue } from '@datastructures-js/queue';
 import Peer from 'simple-peer';
 import nodeDatachannelPolyfill from './node-datachannel/polyfill/index.js';
@@ -37,7 +37,7 @@ setInterval(() => {
   }
 }, 10000);
 
-function finishBootstrap(peer: typeof Peer){
+function finishBootstrap(peer: typeof Peer & {id: UUID, worker: boolean, connectionCount: number}){
   //@ts-ignore
   let ws = qMap.get(peer.id);
   //@ts-ignore
@@ -45,7 +45,7 @@ function finishBootstrap(peer: typeof Peer){
   if(ws){
     ws?.close();
   }
-  //@ts-ignore
+
   if(peer.worker) workers.set(peer.id, peer);
     //@ts-ignore
   else clients.set(peer.id, peer);
@@ -64,7 +64,6 @@ function handleRegister(ws: any, data: any) {
   // console.log({id: data.id, notInMap: !qMap.has(data.id), notInClients: !clients.has(data.id)});
 }
 
-let notset = true;
 
 function createPeer(ws: any, signalData:any){
   let peer = signalingMap.get(ws.id);
@@ -72,30 +71,18 @@ function createPeer(ws: any, signalData:any){
     console.log("peer exists, checking signal data", {signalData});
     peer.signal(signalData.iceData);
     return;
-  }//@ts-ignore
-  else peer = new Peer({initiator: false, wrtc: nodeDatachannelPolyfill, trickle: true});
+  }
+  else {
+    //@ts-ignore
+    peer = new Peer({initiator: false, wrtc: nodeDatachannelPolyfill, trickle: true});
+  }
 
   peer.id = ws.id;
   peer.worker = signalData.worker;
+  signalingMap.set(ws.id, peer);
   peer.on('signal', (data:any) => {
     console.log("onsignal", {data});
-    if(notset && peer._wrtc){
-      notset = false;
-      console.log("_wrtc exists", peer._wrtc);
-      peer._wrtc.megaClose = () => {
-        peer.close();
-        console.log('peer should be closed now')
-      }
-      // peer._wrtc.addEventListener('connectionstatechange', (e) => {
-      //   // console.log("connectionstate change");
-      // });
-    }
-    // if (data.renegotiate || data.transceiverRequest) {
-      //   console.log("reneg or trans", {data});
-    //   return;
-    // }
-    // when peer1 has signaling data, send it to peer 2 through the hub
-    // console.log("sending signal data for connection");
+    // pass the signaling data back through the existing websocket connection.
     ws.send(JSON.stringify({reason: 'signal', iceData: data}));
   });
 
@@ -111,12 +98,11 @@ function createPeer(ws: any, signalData:any){
     // we want to remove the websocket connection and rely only webrtc instead for everything.
     // signal the non-signaling server to clean up with an ahoy (arbitrary)
     peer.send(JSON.stringify({reason: "ahoy"}));
-    peer.pingInterval = setInterval(() => {
-      peer.send(JSON.stringify({reason: "ahoy"})) 
+    setInterval(() => {
+      peer.send(JSON.stringify({reason: "ahoy"}));
     }, 1000);
-    // clean up ourselves
+    // clean ourselves up
     finishBootstrap(peer);
-   
   });
 
   peer.on('data', (msg:any) => {
@@ -138,8 +124,7 @@ function createPeer(ws: any, signalData:any){
 
 function handleSignal(ws:any, data:any) {
   console.log("handleSignal");
-  if(qMap.has(ws.id) && !clients.has(ws.id)){
-    // createPeerGuard(ws, data);
+  if(qMap.has(ws.id) && !clients.has(ws.id) && !workers.has(ws.id)){
     createPeer(ws, data);
   }
 }
@@ -190,6 +175,7 @@ Bun.serve({
       }
     }, // a message is received
     open(ws) {
+      // console.log("websocket opened?", ws);
     }, // a socket is opened
     close(ws, code, message) {
       //@ts-ignore
@@ -198,6 +184,54 @@ Bun.serve({
     drain(ws) {}, // the socket is ready to receive more data
   },
 });
+
+// Bun.serve({
+//   port: 8001,
+//   hostname: "kollator.local",
+//   fetch(req, server) {
+//     const url = new URL(req.url);
+//     if (url.pathname === "/join") return new Response("hey!");
+//     if (url.pathname === "/blog") return new Response("Blog!");
+//     // return new Response("404!");
+
+//     // upgrade the request to a WebSocket
+//     if (server.upgrade(req)) {
+//       return; // do not return a Response
+//     }
+//     return new Response("Upgrade failed :(", { status: 500 });
+//   },
+//   websocket: {
+//     //@ts-ignore
+//     message(ws, data) {
+//       // console.log({data, len: data.length});
+//       //@ts-ignore
+//       if (data.length || data.type === 'utf8') {
+//         //@ts-ignore
+//         const message = JSON.parse(data);
+//         console.log({wsmessage: message});
+//         if(!message.reason) return;
+//         switch(message.reason){
+//           case 'register':
+//             handleRegister(ws, message);
+//             break;
+//           case 'signal':
+//             handleSignal(ws, message);
+//             break;
+//           default:
+//             return;
+//         }
+//       }
+//     }, // a message is received
+//     open(ws) {
+//       // console.log("websocket opened?", ws);
+//     }, // a socket is opened
+//     close(ws, code, message) {
+//       //@ts-ignore
+//       console.error(`Client ${ws.id ?? ''} disconnected`);
+//     }, // a socket is closed
+//     drain(ws) {}, // the socket is ready to receive more data
+//   },
+// });
 
 
 setInterval(() => {

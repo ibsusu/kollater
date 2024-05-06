@@ -2,7 +2,7 @@
   "name": "worker",
   "module": "index.ts",
   "type": "module",
-  "scripts":{
+  "scripts": {
     "preinstall": "cd node-datachannel && bun install ",
     "build": "cd node-datachannel && bun run build"
   },
@@ -24,9 +24,14 @@
     "@datastructures-js/queue": "^4.2.3",
     "@types/simple-peer": "^9.11.8",
     "@types/uuid": "^9.0.8",
+    "global": "^4.4.0",
     "preact": "^10.19.6",
+    "process": "^0.11.10",
     "simple-peer": "^9.11.1",
-    "uuid": "^9.0.1"
+    "tcp-websocket": "^0.1.1",
+    "uuid": "^9.0.1",
+    "websocket-driver": "^0.7.4",
+    "ws": "^8.17.0"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

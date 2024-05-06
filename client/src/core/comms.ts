@@ -7,7 +7,7 @@ import { sleep } from './utils';
 import {v4 as uuidv4} from 'uuid';
 
 console.log("commsworker!!", import.meta.env);
-const WS_URL = "wss://"+ (import.meta.env.DEV ? 'kollator.local:8000' : 'kollator.com');
+const WS_URL = "ws://"+ (import.meta.env.DEV ? 'kollator.local:8000' : 'kollator.com');
 console.log({WS_URL});
 interface RegistrationData {
   success: boolean;
@@ -18,9 +18,6 @@ interface SignalMessage {
 }
 type PeerIdInstance = SimplePeerInstance & {id: string};
 
-// hubSocket.addEventListener('message', event => {
-//   console.log({eventData: event.data});
-// });
 
 const decoder = new TextDecoder(); // bytes -> string
 
@@ -94,7 +91,7 @@ class CommsWorker {
       });
   
       this.hub.on('data', (msg) => {
-        console.log("ondata", msg);
+        console.log("data type", typeof msg);
         let data = JSON.parse(msg);
         switch(data.reason){
           case 'ahoy':
@@ -117,7 +114,7 @@ class CommsWorker {
         if(!this.ws || this.ws.CLOSED || this.ws.CLOSING) {
           this.ws = this.bootstrap();
         }
-        this.ws.send(JSON.stringify({reason: "register", id: this.id, worker: true}));
+        this.ws.send(JSON.stringify({reason: "register", id: this.id}));
       }
     }
   }
@@ -176,13 +173,9 @@ class CommsWorker {
   }
 
   finishBootstrap(){
-    console.log("finished bootstrapping webrtc connection");
-    // this.peers.push(peer); 
-    // this.hub is now being used instead of this.ws
-
     this.ws?.close();
-    setInterval(() => {this.hub.send(JSON.stringify({reason: "ahoy"})) }, 1000);
-
+    console.log("finished bootstrapping webrtc connection, greeting");
+    this.hub.send(JSON.stringify({reason: "ahoy"}));
   }
   test() {
     console.log("commsworker test");
