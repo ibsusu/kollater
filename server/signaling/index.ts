@@ -1,19 +1,23 @@
 import { randomUUID, type UUID } from "crypto";
 import { Queue } from '@datastructures-js/queue';
-import Peer from 'simple-peer';
+import { MinPriorityQueue } from "@datastructures-js/priority-queue";
+import Peer, {type Instance as SimplePeerInstance }from 'simple-peer';
 import nodeDatachannelPolyfill from './node-datachannel/polyfill/index.js';
 import * as nodeDataChannel from './node-datachannel/lib/index.js';
 import { heapStats } from "bun:jsc";
+import { RTC_MESSAGE_REASON as REASON } from "./src/constants";
+import { bmsg as b } from './src/utils';
 
-import {v4 as uuidv4} from 'uuid';
+import {stringify as uuidStringify, parse as uuidParse, v4 as uuidv4, validate as uuidValidate} from 'uuid';
 
 nodeDataChannel.initLogger('Info');
-
+type KPeer = SimplePeerInstance & {id: UUID, worker: boolean, connectionCount: number};
 
 const clients = new Map();
 const queue = new Queue<any>();
 const qMap = new Map();
-const workers = new Map(); // {id: uuid}
+const workers = new Map<UUID, KPeer>(); // {id: uuid}
+const workerPriorityQueue = new MinPriorityQueue<KPeer>((peer) => peer.connectionCount);
 //@ts-ignore
 const hubId = new uuidv4();
 clients.set(hubId, null);
@@ -21,13 +25,14 @@ qMap.set(hubId, null);
 const signalingMap = new Map();
 
 const encoder = new TextEncoder(); // string -> bytes
-const decoder = new TextDecoder();
+const decoder = new TextDecoder(); // bytes -> string
+
 
 console.log("running");
 
 setInterval(() => {
   let now = Date.now();
-  while(queue.size() && now - queue.back().date > 10000){
+  while(queue.size() && now - queue.front().date > 10000){
     const id = queue.pop();
     let ws = qMap.get(id);
     if(ws){
@@ -37,18 +42,31 @@ setInterval(() => {
   }
 }, 10000);
 
-function finishBootstrap(peer: typeof Peer & {id: UUID, worker: boolean, connectionCount: number}){
-  //@ts-ignore
+function finishBootstrap(peer: KPeer){
+  console.log("finishing bootstrapping", peer.id);
   let ws = qMap.get(peer.id);
-  //@ts-ignore
   qMap.delete(peer.id);
   if(ws){
     ws?.close();
   }
 
-  if(peer.worker) workers.set(peer.id, peer);
-    //@ts-ignore
-  else clients.set(peer.id, peer);
+  if(peer.worker) {
+    workers.set(peer.id, peer);
+    workerPriorityQueue.enqueue(peer);
+  }
+  else {
+    clients.set(peer.id, peer);
+    enmesh(peer);
+  }
+}
+
+function enmesh(peer: KPeer) {
+  let worker = workerPriorityQueue.pop();
+  if(worker){
+    console.log("ENMESHING");
+    workerPriorityQueue.enqueue(worker);
+    worker.send(b(REASON.CONNECTION_INITIATION, uuidParse(peer.id)));
+  }
 }
 
 
@@ -57,6 +75,7 @@ function handleRegister(ws: any, data: any) {
   if(data.id && !qMap.has(data.id) && !clients.has(data.id) && !workers.has(data.id)){
     // console.log("doing the send dance");
     ws.id = data.id;
+    ws.worker = data.worker;
     ws.send(JSON.stringify({reason: 'register', success: true}));
     qMap.set(ws.id, ws);
     queue.enqueue({id: ws.id, date: Date.now()});
@@ -72,13 +91,14 @@ function createPeer(ws: any, signalData:any){
     peer.signal(signalData.iceData);
     return;
   }
-  else {
-    //@ts-ignore
-    peer = new Peer({initiator: false, wrtc: nodeDatachannelPolyfill, trickle: true});
-  }
 
-  peer.id = ws.id;
-  peer.worker = signalData.worker;
+  //@ts-ignore
+  peer = new Peer({initiator: false, wrtc: nodeDatachannelPolyfill, trickle: true});
+
+
+  ({id: peer.id, worker: peer.worker} = ws);
+
+  console.log("SIGNALDATA", {signalData, peer});
   signalingMap.set(ws.id, peer);
   peer.on('signal', (data:any) => {
     console.log("onsignal", {data});
@@ -97,36 +117,71 @@ function createPeer(ws: any, signalData:any){
     // at this point we are now bootstrapped into webrtc.
     // we want to remove the websocket connection and rely only webrtc instead for everything.
     // signal the non-signaling server to clean up with an ahoy (arbitrary)
-    peer.send(JSON.stringify({reason: "ahoy"}));
-    setInterval(() => {
-      peer.send(JSON.stringify({reason: "ahoy"}));
-    }, 1000);
+
+    // console.log("onconnect reason binary message", b(REASON.AHOY));
+    peer.send(b(REASON.AHOY));
+    // setInterval(() => {
+    //   peer.
+    //   peer.send(JSON.stringify({reason: "ahoy"}));
+    // }, 1000);
     // clean ourselves up
     finishBootstrap(peer);
   });
 
-  peer.on('data', (msg:any) => {
-    console.log("ondata");
-    let data = JSON.parse(decoder.decode(msg));
-    console.log({data});
-    // switch(data.reason){
-    //   case 'ahoy':
-    //     finishBootstrap(peer);
-    //   default:
-    //     return;
-    // }
-  });
+  peer.on('data', (msg: Buffer) => {
+    // let data = JSON.parse(decoder.decode(msg, {stream: false}));
+    let data = new Uint8Array(msg);
+    console.log("received data", data);
+    let reason = data[0];
+      switch(reason) {
+        case REASON.AHOY:
+          console.log("received ahoy");
+          break;
+        case REASON.RELAY_SIGNAL:
+          handleRelay(peer, data.slice(1));
+          break;
 
+        default:
+          return;
+      }
+  });
   peer.signal(signalData.iceData);
   // console.log("after peer signaling");
   return peer;
 }
 
 function handleSignal(ws:any, data:any) {
-  console.log("handleSignal");
+  console.log("handleSignal", data);
   if(qMap.has(ws.id) && !clients.has(ws.id) && !workers.has(ws.id)){
     createPeer(ws, data);
   }
+}
+
+function handleRelay(peer: KPeer, data: Uint8Array){
+  let senderId = uuidStringify(data, 16);
+  if(!uuidValidate(senderId)){
+    console.warn(`relay sender id ${senderId} is not valid for requester ${peer.id}`);
+    return;
+  }
+
+  if(senderId !== peer.id) {
+    console.warn(`relay sender id ${senderId} does not equal ${peer.id}`);
+    return;
+  }
+
+  let relayRecipientId = uuidStringify(data) as UUID;
+  if(!uuidValidate(relayRecipientId)){
+    console.warn(`relay recipient id ${relayRecipientId} is not valid for requester ${peer.id}`);
+    return;
+  }
+  let relayRecipient = clients.get(relayRecipientId)
+  if(!relayRecipient) workers.get(relayRecipientId);
+  if(!relayRecipient) {
+    console.warn(`relay recipient doesn't exist for id ${relayRecipientId}, requester is ${peer.id}`);
+    return;
+  }
+  console.log(`relaying signal data from ${peer.id} to ${relayRecipientId}`);
+  relayRecipient.send(b(REASON.SIGNAL, data));
 }
 
 Bun.serve({

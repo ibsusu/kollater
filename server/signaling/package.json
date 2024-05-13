@@ -2,7 +2,7 @@
   "name": "signaling",
   "module": "index.ts",
   "type": "module",
-  "scripts":{
+  "scripts": {
     "preinstall": "cd node-datachannel && bun install ",
     "build": "cd node-datachannel && bun run build"
   },
@@ -21,6 +21,7 @@
     "typescript": "^5.3.2"
   },
   "dependencies": {
+    "@datastructures-js/priority-queue": "^6.3.1",
     "@datastructures-js/queue": "^4.2.3",
     "@types/simple-peer": "^9.11.8",
     "@types/uuid": "^9.0.8",
