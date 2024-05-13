@@ -61,12 +61,16 @@ function finishBootstrap(peer: KPeer){
 }
 
 function enmesh(peer: KPeer) {
-  let worker = workerPriorityQueue.pop();
-  if(worker){
-    console.log("ENMESHING");
-    workerPriorityQueue.enqueue(worker);
-    worker.send(b(REASON.CONNECTION_INITIATION, uuidParse(peer.id)));
+  let worker;
+  while(!worker && workerPriorityQueue.size()){
+    worker = workerPriorityQueue.pop();
+    if(worker.destroyed) worker = undefined;
   }
+  if(!worker) return;
+
+  console.log("ENMESHING");
+  workerPriorityQueue.enqueue(worker);
+  worker.send(b(REASON.CONNECTION_INITIATION, uuidParse(peer.id)));
 }
 
 

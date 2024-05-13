@@ -88,8 +88,8 @@ export class Communicator {
       peer.signal(signalData);
       return;
     }
-
-    peer = new Peer({ initiator }) as unknown as KPeer;
+    //@ts-ignore
+    peer = new Peer({ initiator, wrtc: nodeDatachannelPolyfill, trickle: true }) as KPeer;
     peer.id = signalId;
 
     peer.on('signal', (data) => {
