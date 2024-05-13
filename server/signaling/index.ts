@@ -18,8 +18,8 @@ const queue = new Queue<any>();
 const qMap = new Map();
 const workers = new Map<UUID, KPeer>(); // {id: uuid}
 const workerPriorityQueue = new MinPriorityQueue<KPeer>((peer) => peer.connectionCount);
-//@ts-ignore
-const hubId = new uuidv4();
+
+const hubId = uuidv4();
 clients.set(hubId, null);
 qMap.set(hubId, null);
 const signalingMap = new Map();
@@ -53,9 +53,13 @@ function finishBootstrap(peer: KPeer){
   if(peer.worker) {
     workers.set(peer.id, peer);
     workerPriorityQueue.enqueue(peer);
+    const idList = Array.from(workers.keys());
+    console.log({workers: idList});
   }
   else {
     clients.set(peer.id, peer);
+    const idList = Array.from(clients.keys());
+    console.log({clients: idList});
     enmesh(peer);
   }
 }
@@ -70,7 +74,9 @@ function enmesh(peer: KPeer) {
 
   console.log("ENMESHING");
   workerPriorityQueue.enqueue(worker);
-  worker.send(b(REASON.CONNECTION_INITIATION, uuidParse(peer.id)));
+  // sender, receiver
+  // the receiver is the one that initiates the signaling process. when handling the connection_initiation msg
+  worker.send(b(REASON.CONNECTION_INITIATION, uuidParse(peer.id), uuidParse(worker.id)));
 }
 
 
@@ -80,7 +86,7 @@ function handleRegister(ws: any, data: any) {
     // console.log("doing the send dance");
     ws.id = data.id;
     ws.worker = data.worker;
-    ws.send(JSON.stringify({reason: 'register', success: true}));
+    ws.send(JSON.stringify({reason: 'register', id: hubId, success: true}));
     qMap.set(ws.id, ws);
     queue.enqueue({id: ws.id, date: Date.now()});
   }
@@ -135,8 +141,8 @@ function createPeer(ws: any, signalData:any){
   peer.on('data', (msg: Buffer) => {
     // let data = JSON.parse(decoder.decode(msg, {stream: false}));
     let data = new Uint8Array(msg);
-    console.log("received data", data);
     let reason = data[0];
+    console.log("received data", REASON[reason], data);
       switch(reason) {
         case REASON.AHOY:
           console.log("received ahoy");
@@ -144,7 +150,6 @@ function createPeer(ws: any, signalData:any){
         case REASON.RELAY_SIGNAL:
           handleRelay(peer, data.slice(1));
           break;
-
         default:
           return;
       }
@@ -162,7 +167,9 @@ function handleSignal(ws:any, data:any) {
 }
 
 function handleRelay(peer: KPeer, data: Uint8Array){
-  let senderId = uuidStringify(data, 16);
+  console.log("handle relay", {data});
+  let senderId = uuidStringify(data);
+  console.log("handle relay, senderId", {senderId});
   if(!uuidValidate(senderId)){
     console.warn(`relay sender id ${senderId} is not valid for requester ${peer.id}`);
     return;
@@ -173,15 +180,21 @@ function handleRelay(peer: KPeer, data: Uint8Array){
     return;
   }
 
-  let relayRecipientId = uuidStringify(data) as UUID;
+  let relayRecipientId = uuidStringify(data,16) as UUID;
   if(!uuidValidate(relayRecipientId)){
     console.warn(`relay recipient id ${relayRecipientId} is not valid for requester ${peer.id}`);
     return;
   }
-  let relayRecipient = clients.get(relayRecipientId)
-  if(!relayRecipient) workers.get(relayRecipientId);
+  let relayRecipient = clients.get(relayRecipientId) ?? workers.get(relayRecipientId);
   if(!relayRecipient) {
     console.warn(`relay recipient doesn't exist for id ${relayRecipientId}, requester is ${peer.id}`);
+    return;
+  }
+  if(relayRecipient.destroyed) {
+    console.warn("relay recipient was destroyed, cleaning up");
+    clients.delete(relayRecipientId);
+    workers.delete(relayRecipientId);
+    relayRecipient = undefined;
     return;
   }
   console.log(`relaying signal data from ${peer.id} to ${relayRecipientId}`);
@@ -238,7 +251,7 @@ Bun.serve({
     }, // a socket is opened
     close(ws, code, message) {
       //@ts-ignore
-      console.error(`Client ${ws.id ?? ''} disconnected`);
+      console.warn(`Client ${ws.id ?? ''} disconnected`);
     }, // a socket is closed
     drain(ws) {}, // the socket is ready to receive more data
   },

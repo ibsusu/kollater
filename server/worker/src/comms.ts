@@ -2,7 +2,7 @@ import Peer, {type Instance as SimplePeerInstance} from 'simple-peer';
 import nodeDatachannelPolyfill from '../node-datachannel/polyfill/index.js';
 import * as nodeDataChannel from '../node-datachannel/lib/index.js';
 import { sleep, bmsg as b, uint8ArrayToHex, bytesToString } from './utils';
-import {stringify as uuidStringify, parse as uuidParse, v4 as uuidv4, validate as uuidValidate} from 'uuid';
+import {stringify as uuidStringify, parse as uuidParse, v4 as uuidv4, validate as uuidValidate, stringify} from 'uuid';
 import type { UUID } from 'crypto';
 import { RTC_MESSAGE_REASON as REASON } from "./constants";
 import { create } from 'domain';
@@ -26,7 +26,7 @@ interface RegistrationData {
 interface SignalMessage {
   iceData: Peer.SignalData
 }
-type KPeer = SimplePeerInstance & {id: string, worker: boolean};
+type KPeer = SimplePeerInstance & {id: string, worker: boolean, sentOffer: boolean, signalDatas: Queue<any>};
 
 // const decoder = new TextDecoder(); // bytes -> string
 const encoder = new TextEncoder(); // string -> bytes
@@ -64,24 +64,28 @@ export class Communicator {
   }
 
   validateSignalId(relayPeer: KPeer, data: Uint8Array){
-    let signalerId = uuidStringify(data.slice(0, 16));
-    if(!uuidValidate(signalerId)){
-      console.warn(`signal initiator id ${signalerId} is not valid relayer: ${relayPeer.id}`);
+    let senderId = uuidStringify(data);
+    if(!uuidValidate(senderId)){
+      console.warn(`signal initiator id ${senderId} is not valid relayer: ${relayPeer.id}`);
       return false;
     }
 
-    let recipientId = uuidStringify(data);
-    if(!uuidValidate(recipientId)){
-      console.warn(`signal initiator id ${signalerId} is not valid ${relayPeer.id}`);
+    let receiverId = uuidStringify(data, 16);
+    if(!uuidValidate(receiverId)){
+      console.warn(`signal receiver id ${receiverId} is not valid ${relayPeer.id}`);
       return false;
     }
-    return signalerId;
+    return senderId;
   }
 
+  // byte data should be [sender, receiver, signalData]: [16bytes, 16bytes, whatever];
+  // TODO: change the packing when we move to biscuits.
   createPeer(relayPeer: KPeer, initiator: boolean, data: Uint8Array){
-    let signalId = this.validateSignalId(relayPeer, data);
-    if(!signalId) return;
-    let peer = this.signalingMap.get(signalId);
+    let signalSenderId = this.validateSignalId(relayPeer, data);
+    console.log("createPeer hit by:", signalSenderId);
+    if(!signalSenderId) return;
+    let peer = this.signalingMap.get(signalSenderId) ?? this.peers.get(signalSenderId);
+
     if(peer){
       let signalData = JSON.parse(bytesToString(data.slice(32)));
       console.log("peer exists, checking signal data", {signalData});
@@ -89,17 +93,36 @@ export class Communicator {
       return;
     }
     //@ts-ignore
-    peer = new Peer({ initiator, wrtc: nodeDatachannelPolyfill, trickle: true }) as KPeer;
-    peer.id = signalId;
-
+    peer = new Peer({ initiator, wrtc: nodeDatachannelPolyfill, trickle: true}) as KPeer;
+    peer.id = signalSenderId;
+    peer.sentOffer = false;
+    peer.signalDatas = new Queue();
+    this.signalingMap.set(peer.id, peer);
     peer.on('signal', (data) => {
       // when peer1 has signaling data, send it to peer 2 through the hub
-      relayPeer.send(b(REASON.SIGNAL, JSON.stringify(data)));
+      console.log({outgoing: data});
+      console.log(`current peer id is ${this.id}, relaying through ${relayPeer.id} to signal ${signalSenderId}`, {relayPeerId: relayPeer.id});
+      if(!peer.sentOffer && data.type !== 'offer') {
+        peer.signalDatas.enqueue(data);
+        return;
+      }
+      relayPeer.send(b(REASON.RELAY_SIGNAL, uuidParse(this.id), uuidParse(signalSenderId), JSON.stringify(data)));
+      peer.sentOffer = true;
+      while(!peer.signalDatas.isEmpty()){
+        relayPeer.send(b(REASON.RELAY_SIGNAL, uuidParse(this.id), uuidParse(signalSenderId), JSON.stringify(peer.signalDatas.dequeue())));
+      }
     });
 
     peer.on('connect', () => {
+      console.log("peer connect, sending ahoy");
+      this.signalingMap.delete(peer.id);
+      this.peers.set(peer.id, peer);
       peer.send(b(REASON.AHOY));
       console.log(`finished peering webrtc connection, greeting ${peer.id}`);
+    });
+
+    peer.on('error', (err) => {
+      console.error("there was an error creating this peer", err);
     });
 
     peer.on('data', (msg) => {
@@ -114,7 +137,7 @@ export class Communicator {
           break;
         case REASON.SIGNAL:
           console.log("received signal request");
-          this.createPeer(this.hub, false, msg.slice(1));
+          this.createPeer(peer, false, msg.slice(1));
           break;
         default:
           return;
@@ -136,6 +159,7 @@ export class Communicator {
       //@ts-ignore
       this.hub = new Peer({initiator: true, wrtc: nodeDatachannelPolyfill, trickle: true});
       this.hub.id = data.id;
+      console.log("setting hubId", data.id, this.hub.id);
       
       this.hub.on('signal', (data) => {
         console.log("onsignal");
@@ -166,7 +190,9 @@ export class Communicator {
           case REASON.CONNECTION_INITIATION:
             this.createPeer(this.hub, true, msg.slice(1));
             break;
-          case 2:
+          case REASON.SIGNAL:
+            this.createPeer(this.hub, false, msg.slice(1));
+            break;
           default:
             return;
         }
@@ -256,7 +282,7 @@ export class Communicator {
     this.ws?.close();
     this.ws = undefined;
     console.log("finished bootstrapping webrtc connection, greeting them as a worker");
-    this.hub.send(JSON.stringify({reason: "ahoy"}));
+    this.hub.send(b(REASON.AHOY));
     clearInterval(bootstrapInterval);
   }
   test() {

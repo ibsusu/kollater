@@ -55,47 +55,67 @@ class CommsWorker {
   }
 
   validateSignalId(relayPeer: KPeer, data: Uint8Array){
-    let signalerId = uuidStringify(data.slice(0, 16));
-    if(!uuidValidate(signalerId)){
-      console.warn(`signal initiator id ${signalerId} is not valid relayer: ${relayPeer.id}`);
+    let senderId = uuidStringify(data);
+    if(!uuidValidate(senderId)){
+      console.warn(`signal initiator id ${senderId} is not valid relayer: ${relayPeer.id}`);
       return false;
     }
 
-    let recipientId = uuidStringify(data);
-    if(!uuidValidate(recipientId)){
-      console.warn(`signal initiator id ${signalerId} is not valid ${relayPeer.id}`);
+    let receiverId = uuidStringify(data, 16);
+    if(!uuidValidate(receiverId)){
+      console.warn(`signal receiver id ${receiverId} is not valid ${relayPeer.id}`);
       return false;
     }
-    return signalerId;
+    return senderId;
   }
 
   createPeer(relayPeer: KPeer, initiator: boolean, data: Uint8Array){
-    let signalId = this.validateSignalId(relayPeer, data);
-    if(!signalId) return;
-    let peer = this.signalingMap.get(signalId);
+    console.log("createPeer");
+    let signalSenderId = this.validateSignalId(relayPeer, data);
+    console.log({signalSenderId});
+    if(!signalSenderId) return;
+    let peer = this.signalingMap.get(signalSenderId);
     if(peer){
       let signalData = JSON.parse(bytesToString(data.slice(32)));
+      //@ts-ignore;
+      window.signalingData.push({incoming: signalData});
       console.log("peer exists, checking signal data", {signalData});
       peer.signal(signalData);
       return;
     }
 
-    peer = new Peer({ initiator }) as unknown as KPeer;
-    peer.id = signalId;
+    if(!initiator){ console.log("initiating the connection with a signal answer");}
+
+    peer = new Peer({ initiator, trickle: true }) as unknown as KPeer;
+    peer.id = signalSenderId;
+    this.signalingMap.set(peer.id, peer);
 
     peer.on('signal', (data) => {
       // when peer1 has signaling data, send it to peer 2 through the hub
-      relayPeer.send(b(REASON.SIGNAL, JSON.stringify(data)));
+      // console.log({outgoing: data});
+      window.signalingData.push({outgoing: data});
+      console.log(`current peer id is ${this.id}, relaying through ${relayPeer.id} to signal ${signalSenderId}`);
+      relayPeer.send(b(REASON.RELAY_SIGNAL, uuidParse(this.id), uuidParse(signalSenderId), JSON.stringify(data)));
+    });
+
+    peer.on('error', (err) => {
+      console.error("there was an error creating this peer", err);
+    });
+
+    peer.on('finish', (ev) => {
+      console.log("FINISHED", ev);
     });
 
     peer.on('connect', () => {
+      console.log("peer connect, sending ahoy");
       peer.send(b(REASON.AHOY));
       console.log(`finished peering webrtc connection, greeting ${peer.id}`);
+      this.signalingMap.delete(peer.id);
+      this.peers.set(peer.id, peer);
     });
 
     peer.on('data', (msg) => {
-      let data = JSON.parse(decoder.decode(msg, {stream: false}));
-      console.log("received data", data);
+      console.log("received data", REASON[msg[0]]);
       const reason = msg[0];
       switch(reason){
         case REASON.AHOY:
@@ -106,12 +126,15 @@ class CommsWorker {
           break;
         case REASON.SIGNAL:
           console.log("received signal request");
-          this.createPeer(this.hub, false, msg.slice(1));
+          this.createPeer(peer, false, msg.slice(1));
           break;
         default:
           return;
       }
     });
+    const signalData = JSON.parse(bytesToString(data.slice(32)));
+    window.signalingData.push({incoming: signalData})
+    peer.signal(signalData);
     return peer;
   }
 
@@ -130,7 +153,8 @@ class CommsWorker {
       this.hub.id = data.id;
       
       this.hub.on('signal', (data) => {
-        console.log("onsignal");
+        console.log("onsignal", data);
+        window.signalingData.push({outgoing:data});
         //@ts-ignore
         // if (data.renegotiate || data.transceiverRequest) {
         //   console.log("reneg or trans", {data});
@@ -248,6 +272,8 @@ class CommsWorker {
   }
 }
 console.log("before new commsworker");
+//@ts-ignore
+window.signalingData = [];
 let comms = new CommsWorker();
 
 console.log("after new commsworker");
