@@ -1,4 +1,4 @@
-import { Communicator } from './src/comms';
+import { Communicator, type KPeer } from './src/comms';
 import { Filer} from './src/filer';
 
 console.log("commsworker!!", process.env.KOLLATOR_DOMAIN);
@@ -13,21 +13,20 @@ class KWorker {
 
   constructor(){
     console.log("new KWorker");
-    this.comms = new Communicator();
-    // this.comms.on('upload', this.uploadHandler);
-    // this.comms.on('download', this.downloadHandler);
     this.filer = new Filer();
+    this.comms = new Communicator(this.uploadHandler, this.downloadHandler);
     this.runPromise = new Promise(res => {
       this.runResolver = res;
     });
   }
 
-  async uploadHandler(ip: string, hash: string, start: number, end: number, length: number, data: Uint8Array) {
-      
+  async uploadHandler(uploader: KPeer, data: Uint8Array) {
+    // peerId: string, hash: string, start: number, end: number, length: number, data: Uint8Array
+    console.log("handle upload", uploader.id);
   }
 
-  async downloadHandler(ip: string, hash: string){
-
+  async downloadHandler(downloader: KPeer, data: Uint8Array){
+    console.log("handle download", downloader.id);
   }
 
   run(){

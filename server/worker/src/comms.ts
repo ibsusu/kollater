@@ -26,7 +26,7 @@ interface RegistrationData {
 interface SignalMessage {
   iceData: Peer.SignalData
 }
-type KPeer = SimplePeerInstance & {id: string, worker: boolean, sentOffer: boolean, signalDatas: Queue<any>};
+export type KPeer = SimplePeerInstance & {id: string, worker: boolean, sentOffer: boolean, signalDatas: Queue<any>};
 
 // const decoder = new TextDecoder(); // bytes -> string
 const encoder = new TextEncoder(); // string -> bytes
@@ -41,14 +41,18 @@ export class Communicator {
   signalingInterval: number;
   id: string;
   bootstrapAttempts: number;
+  uploadHandler: (uploader: KPeer, data: Uint8Array) => void;
+  downloadHandler: (downloader: KPeer, data: Uint8Array) => void;
 
-  constructor(){
+  constructor(uploadHandler: { (uploader: KPeer, data: Uint8Array): Promise<void>; (KPeer: any, Uint8Array: any): void; }, downloadHandler: { (downloader: KPeer, data: Uint8Array): Promise<void>; (KPeer: any, Uint8Array: any): void; }){
     this.peers = new Map<string, KPeer>();
     this.id = uuidv4();
     this.bootstrapAttempts = 0;
     this.ws = this.bootstrap();
     this.signalingQueue = new Queue();
     this.signalingMap = new Map();
+    this.uploadHandler = uploadHandler;
+    this.downloadHandler = downloadHandler;
     this.signalingInterval = setInterval(() => {
       let now = Date.now();
       while(this.signalingQueue.size() && now - this.signalingQueue.front().date > 10000){
@@ -138,6 +142,13 @@ export class Communicator {
         case REASON.SIGNAL:
           console.log("received signal request");
           this.createPeer(peer, false, msg.slice(1));
+          break;
+        case REASON.UPLOAD:
+          
+          break;
+        case REASON.DOWNLOAD:
+          break;
+        case REASON.REPORT:
           break;
         default:
           return;

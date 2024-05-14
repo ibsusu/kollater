@@ -78,7 +78,7 @@ class CommsWorker {
     if(peer){
       let signalData = JSON.parse(bytesToString(data.slice(32)));
       //@ts-ignore;
-      window.signalingData.push({incoming: signalData});
+      //window.signalingData.push({incoming: signalData});
       console.log("peer exists, checking signal data", {signalData});
       peer.signal(signalData);
       return;
@@ -93,7 +93,7 @@ class CommsWorker {
     peer.on('signal', (data) => {
       // when peer1 has signaling data, send it to peer 2 through the hub
       // console.log({outgoing: data});
-      window.signalingData.push({outgoing: data});
+      //window.signalingData.push({outgoing: data});
       console.log(`current peer id is ${this.id}, relaying through ${relayPeer.id} to signal ${signalSenderId}`);
       relayPeer.send(b(REASON.RELAY_SIGNAL, uuidParse(this.id), uuidParse(signalSenderId), JSON.stringify(data)));
     });
@@ -133,7 +133,7 @@ class CommsWorker {
       }
     });
     const signalData = JSON.parse(bytesToString(data.slice(32)));
-    window.signalingData.push({incoming: signalData})
+    //window.signalingData.push({incoming: signalData})
     peer.signal(signalData);
     return peer;
   }
@@ -154,7 +154,7 @@ class CommsWorker {
       
       this.hub.on('signal', (data) => {
         console.log("onsignal", data);
-        window.signalingData.push({outgoing:data});
+        //window.signalingData.push({outgoing:data});
         //@ts-ignore
         // if (data.renegotiate || data.transceiverRequest) {
         //   console.log("reneg or trans", {data});
