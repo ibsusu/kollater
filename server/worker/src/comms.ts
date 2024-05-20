@@ -126,11 +126,11 @@ export class Communicator {
     });
 
     peer.on('error', (err) => {
-      console.error("there was an error creating this peer", err);
+      console.error(`Peer error with ${peer.id}`, err);
     });
 
     peer.on('data', (msg) => {
-      console.log("received data", data);
+      console.log("received data", new Uint8Array(msg));
       const reason = msg[0];
       switch(reason){
         case REASON.AHOY:
@@ -144,7 +144,8 @@ export class Communicator {
           this.createPeer(peer, false, msg.slice(1));
           break;
         case REASON.UPLOAD:
-          
+          console.log("received upload request data:", msg.slice(0, 100));
+          this.uploadHandler(peer, msg.slice(1));
           break;
         case REASON.DOWNLOAD:
           break;

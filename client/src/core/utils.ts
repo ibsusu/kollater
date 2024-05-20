@@ -1,4 +1,8 @@
 export const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+import {
+  toByteArray as b64ToBytes, 
+  // fromByteArray as bytesTob64
+} from 'base64-js';
 
 export const slogans = {
   "collect": [
@@ -89,7 +93,10 @@ export function bmsg(reason: REASON, ...dataArgs: (string | Uint8Array | Buffer 
     if (typeof data === 'string') {
       encodedData = encoder.encode(data);
     } else if (typeof data === 'number') {
-      encodedData = new Uint8Array([data]);
+      if(data < 256 && data >= 0)
+        encodedData = new Uint8Array([data]);
+      else
+        encodedData = numberToBytes(data);
     } else {
       encodedData = data instanceof Uint8Array ? data : new Uint8Array(data);
     }
@@ -115,5 +122,37 @@ export function bytesToString(bytes: Uint8Array){
   return decoder.decode(bytes);
 }
 
+export function numberToBytes(num: number){
+  const numBytes = new Uint8Array(8);
+  const view = new DataView(numBytes.buffer);
+  view.setBigUint64(0, BigInt(num), true); // true for little-endian
+  return numBytes;
+}
+
+export async function importKeyFromBase64(base64: string): Promise<CryptoKey> {
+  const keyBytes = b64ToBytes(base64);
+  const importedKey = await crypto.subtle.importKey(
+      'raw',
+      keyBytes.buffer,
+      { name: 'AES-GCM' },
+      true,
+      ['encrypt', 'decrypt']
+  );
+  return importedKey;
+}
+
+export function incrementIV(iv: Uint8Array): void {
+  for (let i = iv.length - 1; i >= 0; i--) {
+    if (iv[i] < 255) {
+      iv[i]++;
+      break;
+    } else {
+      iv[i] = 0;
+    }
+  }
+}
+
+
 //@ts-ignore
 window.destroyDB = destroyDB;
+destroyDB();

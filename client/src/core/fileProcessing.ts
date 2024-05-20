@@ -1,4 +1,37 @@
 // import { hashers } from "./salt";
+
+export async function* streamFileInChunks(file: File, chunkSize: number): AsyncGenerator<Uint8Array, void, unknown> {
+  console.log({file});
+  const reader = file.stream().getReader();
+  let position = 0;
+  let carryOver = new Uint8Array();
+
+  while (position < file.size) {
+    const { value, done } = await reader.read();
+    if (done) {
+      if (carryOver.byteLength > 0) {
+        yield carryOver;
+      }
+      break;
+    }
+
+    let chunk = new Uint8Array(carryOver.byteLength + value.byteLength);
+    chunk.set(carryOver);
+    chunk.set(value, carryOver.byteLength);
+
+    while (chunk.byteLength >= chunkSize) {
+      const piece = chunk.subarray(0, chunkSize);
+      yield piece;
+      chunk = chunk.subarray(chunkSize);
+    }
+
+    console.log("setting carryOver", {chunk});
+    carryOver = chunk;
+    position += value.byteLength;
+  }
+  yield carryOver;
+}
+
 export async function processFile(inputFile: File) {
   if (!inputFile) {
       alert("Please select a file first.");

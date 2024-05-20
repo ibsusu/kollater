@@ -60,6 +60,7 @@ export class Filer {
     const filesInDirectory = (await readdir(dirGeneral));
 
     const filesToRemove = filesInDirectory.filter(file => !topRequested.includes(splitOnLastHyphen(file)[0]));
+    console.log({filesInDirectory, filesToRemove});
     for( let file of filesToRemove){
       await unlink(file);
     }

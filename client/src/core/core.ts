@@ -1,4 +1,6 @@
 import * as Comlink from "comlink";
+import { transferHandlers } from 'comlink';
+
 import {type CoreWorker} from './worker';
 export {type CoreWorker} from './worker';
 import { isSafari } from "./utils";
@@ -6,6 +8,10 @@ import CoreWebWorker from './worker?worker';
 import {comms} from './comms';
 import { filer } from "./fileStore";
 import { useEffect, useState } from "preact/hooks";
+import { startMainPage, startWorker } from "./glitzUIThread";
+import { asyncGeneratorTransferHandler } from "./comlink-async-generator-handler";
+
+transferHandlers.set('asyncGenerator', asyncGeneratorTransferHandler);
 
 let workerReady = false;
 let initializedEvent = new Event('initialized');
@@ -15,7 +21,8 @@ let workers: Comlink.Remote<CoreWorker>[] = [];
 let readyPromise!: Promise<void>;
 let readyResolver!: (value: void | PromiseLike<void>) => void;
 comms.test();
-export async function initWorkers(){
+
+async function initWorkers(){
   for (let i=0;i<fullWorkerCount;++i){
     if(readyPromise) {
       await readyPromise;
@@ -105,7 +112,20 @@ class WorkManager {
   }
 }
 
+async function initGlitz() {
+  const canvas: any = document.querySelector('#glitz');
+      // canvas.requestFullscreen();
+  if (canvas.transferControlToOffscreen) {
+    startWorker(canvas);
+  } else {
+    startMainPage(canvas);
+  }
+}
+
+
 export async function init() {
+  initGlitz();
+  
   await initWorkers();
   console.log({workManager});
   await (workManager as unknown as WorkManager).init();
@@ -117,6 +137,8 @@ export async function init() {
   window.dispatchEvent(initializedEvent);
 
 }
+
+
 
 export function useCore() {
   const [initialized, setInitialized] = useState(false);

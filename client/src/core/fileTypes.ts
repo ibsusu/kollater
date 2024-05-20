@@ -18,6 +18,7 @@ export type MetaData = {
   name: string;
   size: number;
   key: string; // base64
+  iv: string; // base64
   hash: string;
 };
 
@@ -46,6 +47,8 @@ export interface TorrentMetadata {
     "piece length": number;
     pieces: string; // Concatenated SHA-1 hash data for V1 compatibility
     "meta version": number;
+    "key": string,
+    iv: string,
     "file tree": {
       [filename: string]: {
         "": {

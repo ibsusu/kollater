@@ -1,11 +1,13 @@
 // there can be multiple workers, we need to make sure they don't pull the same import down repeatedly.
 
 import { TorrentMetadata, MetaData, FileState } from './fileTypes';
+import { asyncGeneratorTransferHandler } from './comlink-async-generator-handler';
 // import { blobHashToString } from './salt';
 import {
   // toByteArray as b64ToBytes, 
   fromByteArray as bytesTob64
 } from 'base64-js';
+
 
 // we import in parallel dynamically so we hit cache for future instantiations of the worker.
 // let saltPromise = import('./salt').then(mod => mod);
@@ -14,6 +16,10 @@ let comlinkPromise = import('comlink').then(mod => mod);
 // await all of the imports here
 // const { createKeyPair, decryptStringWithKey, decryptWithPassword, encryptStringWithKey, encryptWithPassword, getFingerprint, getFingerprintRaw, getPublicKeyName, hashToBytes, hashToString, randomNumber, randomString, signCombined, signDetached, verifyCombined, verifyDetached } = await saltPromise;
 let Comlink = await comlinkPromise;
+const { transferHandlers } = await comlinkPromise;
+transferHandlers.set('asyncGenerator', asyncGeneratorTransferHandler);
+
+
 
 
 // may need these later
@@ -125,6 +131,17 @@ class CoreWorker {
     return Object.getOwnPropertyNames(Object.getPrototypeOf(this)).concat(Object.getOwnPropertyNames(this));
   }
 
+  incrementIV(iv: Uint8Array): void {
+    for (let i = iv.length - 1; i >= 0; i--) {
+      if (iv[i] < 255) {
+        iv[i]++;
+        break;
+      } else {
+        iv[i] = 0;
+      }
+    }
+  }
+
   async * streamFileInChunks(file: File, chunkSize: number): AsyncGenerator<Uint8Array, void, unknown> {
     console.log({file});
     const reader = file.stream().getReader();
@@ -156,6 +173,29 @@ class CoreWorker {
     }
     yield carryOver;
   }
+  
+  async * encryptFileForUpload(
+    [
+      file, 
+      chunkLength,
+      validationHashes,
+      key,
+      iv
+    ]: 
+    [File, number, string[], CryptoKey, Uint8Array]
+  )  : AsyncGenerator<Uint8Array, void, unknown> {
+    let hashIndex = 0;
+    for await (const chunk of this.streamFileInChunks(file, chunkLength)){
+      const sha256Hash = new Uint8Array(await crypto.subtle.digest('SHA-256', chunk));
+      const sha256HashString = bytesTob64(sha256Hash);
+      
+      if(sha256HashString !== validationHashes[hashIndex++]) throw Error("hash of chunk does not validationHash");
+      const cipherText = await crypto.subtle.encrypt({name: 'AES-GCM', iv, length: 128}, key, chunk);
+      this.incrementIV(iv);
+      const cipherArray = new Uint8Array(cipherText);
+      yield cipherArray;
+    }
+  }
 
   async processFile([file, directory]: [File, FileSystemDirectoryHandle]): Promise<MetaData> {
     const sha1Hashes: Uint8Array[] = [];
@@ -163,14 +203,14 @@ class CoreWorker {
     const chunkLength = 5242880; //5*1024*1024;
     console.log("processing", {file, directory});
     let key = crypto.getRandomValues(new Uint8Array(16));
-    // let iv = crypto.getRandomValues(new Uint8Array(16));
+    let iv = crypto.getRandomValues(new Uint8Array(16));
     let keyEncoded = await crypto.subtle.importKey('raw', key.buffer, {
         name: 'AES-GCM'
     }, true, ['encrypt', 'decrypt']);
     let exportedKey = await crypto.subtle.exportKey('raw', keyEncoded);
 
     for await (const chunk of this.streamFileInChunks(file, chunkLength)) {
-        // const cipherText = await crypto.subtle.encrypt({name: 'AES-GCM',counter: iv, length: 128}, keyEncoded, chunk);
+        // const cipherText = await crypto.subtle.encrypt({name: 'AES-GCM', iv, length: 128}, keyEncoded, chunk);
         // const cipherArray = new Uint8Array(cipherText);
         // Hash the chunk with SHA-1 and SHA-256 using the Web Crypto API
         const sha1Hash = await crypto.subtle.digest('SHA-1', chunk);
@@ -183,10 +223,15 @@ class CoreWorker {
 
     const sha1String = sha1Hashes.reduce((acc, hash) => acc+bytesTob64(hash), '');    
     const flatMerkleStrings: string[] = [];
+    // const flatMerkleBytes: Uint8Array[] = [];
 
     for(let layer of merkleTree){
       for(let hash of layer){
         flatMerkleStrings.push(bytesTob64(hash));
+        // not doing anything with this yet but it's necessary for the correct bit torrent v2 format.
+        // right now we're using string for better visibility while prototyping.
+        // let's see how long it takes until we actually use it.
+        // flatMerkleBytes.push(hash); 
       }
     }
 
@@ -194,7 +239,9 @@ class CoreWorker {
     let rootHash = flatMerkleStrings.at(-1) ?? '';
     if(!rootHash.length) console.warn("there was no hash generated for the processed file:", file.name ?? Error("no file name"));
 
-    let metadata = this.createTorrentMetaData(file.name, file.size, sha1String, flatMerkleStrings);
+    const exportedKeyString = bytesTob64(new Uint8Array(exportedKey));
+    const exportedIVString = bytesTob64(iv);
+    let metadata = this.createTorrentMetaData(file.name, file.size, sha1String, flatMerkleStrings, exportedKeyString, exportedIVString);
     await this.writeFileAndTorrent(directory, rootHash, file, metadata);
     console.log({rootHash, sha1Hashes, sha256Hashes, merkleTree, flatMerkleStrings});
     let metadataLite: MetaData = {
@@ -203,8 +250,10 @@ class CoreWorker {
       name: file.name,
       hash: rootHash,
       size: file.size,
-      key: bytesTob64(new Uint8Array(exportedKey))
+      key: exportedKeyString,
+      iv: exportedIVString
     }
+    console.log({metadataLite});
     return metadataLite;
   }
 
@@ -220,7 +269,7 @@ class CoreWorker {
     await metastream.close();
   }
 
-  createTorrentMetaData(fileName: string, fileSize: number, sha1String: string, merkleTreeStrings: string[]): TorrentMetadata {
+  createTorrentMetaData(fileName: string, fileSize: number, sha1String: string, merkleTreeStrings: string[], keyString: string, iVString: string): TorrentMetadata {
     return {
       announce: "http://tracker.kollator.com/announce",
       "announce-list": [
@@ -235,6 +284,8 @@ class CoreWorker {
         name: fileName,
         "piece length": 5*1024*1024,
         pieces: sha1String,
+        key: keyString,
+        iv: iVString,
         "meta version": 2,
         "file tree": {
           [fileName]: {

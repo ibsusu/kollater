@@ -3,7 +3,7 @@ import global from 'global';
 import * as process from "process";
 global.process = process;
 import Peer, {Instance as SimplePeerInstance} from 'simple-peer';
-import { sleep, bmsg as b, bytesToString } from './utils';
+import { sleep, bmsg as b, bytesToString, numberToBytes } from './utils';
 import { RTC_MESSAGE_REASON as REASON } from './constants';
 import {stringify as uuidStringify, parse as uuidParse, v4 as uuidv4, validate as uuidValidate} from 'uuid';
 
@@ -19,10 +19,17 @@ interface RegistrationData {
 interface SignalMessage {
   iceData: Peer.SignalData
 }
-type KPeer = SimplePeerInstance & {id: string};
+type KPeer = SimplePeerInstance & {
+  id: string,
+  uploadPromise?: Promise<Uint8Array>;
+  uploadResolver?: (uploadResponse: Uint8Array) => Uint8Array;
+  downloadPromise?: Promise<Uint8Array>;
+  downloadResolver?: (downloadResponse: Uint8Array) => Uint8Array;
+  uploadTimeout: number|undefined;
+};
 
 
-const decoder = new TextDecoder(); // bytes -> string
+// const decoder = new TextDecoder(); // bytes -> string
 
 class CommsWorker {
   hub!: KPeer;
@@ -33,12 +40,14 @@ class CommsWorker {
   signalingInterval: number;
   id: string;
   bootstrapAttempts: number;
+  uploadGaurdPromise?: Promise<any>; 
+  uploadGuardResolver?: (value: any) => void;
 
   constructor(){
     this.peers = new Map<string, KPeer>();
     this.id = uuidv4();
     this.bootstrapAttempts = 0;
-    this.ws = this.bootstrap();
+    // this.ws = this.bootstrap();
     this.signalingQueue = new Queue();
     this.signalingMap = new Map();
     this.signalingInterval = setInterval(() => {
@@ -127,6 +136,16 @@ class CommsWorker {
         case REASON.SIGNAL:
           console.log("received signal request");
           this.createPeer(peer, false, msg.slice(1));
+          break;
+        case REASON.UPLOAD_RESPONSE:
+          if(peer.uploadResolver){
+            peer.uploadResolver(msg.slice(1));
+          }
+          break;
+        case REASON.DOWNLOAD_RESPONSE:
+          if(peer.downloadResolver){
+            peer.downloadResolver(msg.slice(1));
+          }
           break;
         default:
           return;
@@ -269,6 +288,42 @@ class CommsWorker {
   }
   test() {
     console.log("commsworker test");
+  }
+
+  setUploading(peer: KPeer) {
+    this.uploadGaurdPromise = new Promise(res => {
+      this.uploadGuardResolver = res;
+    });
+
+    peer.uploadPromise = new Promise<Uint8Array>(res => {
+      peer.uploadResolver = res as (uploadResponse: Uint8Array) => Uint8Array;
+    }).finally(() => {
+      if(this.uploadGuardResolver){
+        this.uploadGuardResolver(null);
+        this.uploadGuardResolver = undefined;
+      }
+    });
+    return peer.uploadPromise;
+  }
+
+  setDownloading(peer: KPeer){
+    peer.downloadPromise = new Promise<Uint8Array>(res => {
+      peer.downloadResolver = res as (downloadResponse: Uint8Array) => Uint8Array;
+    });
+  }
+
+  async upload(hash: Uint8Array/*32 bytes*/, data: Uint8Array){
+    let peer = this.peers.values().next()?.value;
+    if(!peer || peer.destroyed) throw Error("No peers to upload to");
+    let sizeBytes = numberToBytes(data.byteLength); // explicitly setting to 8 bytes.
+    let uploadingPromise = this.setUploading(peer);
+    console.log("peer sending hash:", hash);
+    // console.log("binary encoding of upload data:", b(REASON.UPLOAD, hash, sizeBytes, data));
+    console.log("binary encoding of upload data:", b(REASON.UPLOAD, data));
+    // console.log("binary encoding of upload data:", b(REASON.UPLOAD, hash.slice(), sizeBytes.slice(), data.slice()));
+    // peer.send(b(REASON.UPLOAD, hash.slice(), sizeBytes.slice(), data.slice()));
+    peer.send(b(REASON.UPLOAD, hash, data));
+    return uploadingPromise;
   }
 }
 console.log("before new commsworker");
