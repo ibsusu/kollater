@@ -10,6 +10,7 @@ import { filer } from "./fileStore";
 import { useEffect, useState } from "preact/hooks";
 import { startMainPage, startWorker } from "./glitzUIThread";
 import { asyncGeneratorTransferHandler } from "./comlink-async-generator-handler";
+import { audioController } from "./audioController";
 
 transferHandlers.set('asyncGenerator', asyncGeneratorTransferHandler);
 
@@ -112,19 +113,22 @@ class WorkManager {
   }
 }
 
-async function initGlitz() {
+async function initGlitz(messagePort: MessagePort) {
   const canvas: any = document.querySelector('#glitz');
-      // canvas.requestFullscreen();
+  
   if (canvas.transferControlToOffscreen) {
-    startWorker(canvas);
+    startWorker(canvas, messagePort);
   } else {
-    startMainPage(canvas);
+    startMainPage(canvas, messagePort);
   }
 }
 
 
 export async function init() {
-  initGlitz();
+  const channel = new MessageChannel();
+  initGlitz(channel.port1);
+  await audioController.init(undefined, channel.port2);
+  
   
   await initWorkers();
   console.log({workManager});

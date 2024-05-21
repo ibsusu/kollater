@@ -3,6 +3,8 @@ import {UIController} from './uiController.ts';
 // import {type GlitzWorker} from './glitzWorker';
 // export {type GlitzWorker} from './glitzWorker';
 import GlitzWorker from './glitzWorker?worker';
+import { audioController } from './audioController.ts';
+
 
 const mouseEventHandler = makeSendPropertiesHandler([
   'ctrlKey',
@@ -44,6 +46,7 @@ function copyProperties(src: any, properties: any, dst: any) {
 }
 
 function makeSendPropertiesHandler(properties: any) {
+
   return function sendProperties(event: any, sendFn: any) {
     const data = {type: event.type};
     copyProperties(event, properties, data);
@@ -108,6 +111,7 @@ class ElementProxy {
 
     for (const [eventName, handler] of Object.entries(eventHandlers)) {
       console.log("addeventListener", element, eventName);
+      if(eventName === 'pointerUp') 
       element.addEventListener(eventName, function(event: any) {
         //@ts-ignore
         handler(event, sendEvent);
@@ -143,13 +147,14 @@ class ElementProxy {
 
 }
 
-export function startWorker(canvas: HTMLCanvasElement) {
+export function startWorker(canvas: HTMLCanvasElement, messagePort: MessagePort) {
   console.log("startworker");
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
   canvas.focus();
   const offscreen = canvas.transferControlToOffscreen();
   const worker = new GlitzWorker();
+  worker.postMessage({reason: 'initialize',  port: messagePort }, [messagePort]);
 
   const eventHandlers = {
     // contextmenu: preventDefaultHandler,
@@ -165,6 +170,7 @@ export function startWorker(canvas: HTMLCanvasElement) {
     wheel: wheelEventHandler,
     keydown: filteredKeydownEventHandler,
   };
+
   const proxy = new ElementProxy(window, worker, eventHandlers);
   // const proxy = new ElementProxy(canvas, worker, eventHandlers);
   const msg = {
@@ -177,6 +183,7 @@ export function startWorker(canvas: HTMLCanvasElement) {
     screenHeight: window.screen.height,
     devicePixelRatio: window.devicePixelRatio
   };
+  
 
   worker.postMessage(msg, [offscreen]);
   // window.addEventListener('fullscreenchange', event => {
@@ -185,12 +192,16 @@ export function startWorker(canvas: HTMLCanvasElement) {
   // });
 }
 
-export async function startMainPage(canvas: HTMLCanvasElement) {
+export async function startMainPage(canvas: HTMLCanvasElement, messagePort: MessagePort) {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
   canvas.focus();
 
   const controller = new UIController();
+  messagePort.onmessage = (e) => {
+    console.log("worker received audio data", e.data);
+  }
+
   controller.width = canvas.width;
   controller.height = canvas.height;
 

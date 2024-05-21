@@ -60,10 +60,20 @@ const handlers = {
 self.onmessage = function(e) {
   //@ts-ignore
   const fn = handlers[e.data.type];
-  // console.log("onmessage data type", e, e.data.type)
+
   if (typeof fn !== 'function') {
+    if(e.data?.reason === 'initialize'){
+      let port = e.data.port;
+      //@ts-ignore
+      port.onmessage = (ev) => {
+
+        // console.log("worker recieved audio data", ev.data);
+      }
+      return;
+    }
     throw new Error('no handler for type: ' + e.data.type);
   }
+  
 
   fn(e.data);
 };

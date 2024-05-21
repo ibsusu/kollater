@@ -1,94 +1,71 @@
 import * as THREE from 'three';
-//@ts-ignore
-let camera: THREE.Camera, scene: THREE.Object3D<THREE.Object3DEventMap>, renderer: THREE.WebGLRenderer, group: THREE.Group;
+import {updateSoundAndTouchHistory} from './glitzHistory';
+class Scene {
+  private camera!: THREE.PerspectiveCamera;
+  private scene!: THREE.Scene;
+  private renderer!: THREE.WebGLRenderer;
+  private group!: THREE.Group;
+  private seed: number;
 
-//@ts-ignore
-function init( canvas, width, height, pixelRatio, path ) {
+  constructor() {
+    this.seed = Math.floor(Math.random()*100);
+  }
 
-	camera = new THREE.PerspectiveCamera( 40, width / height, 1, 1000 );
-	camera.position.z = 200;
+  public init(canvas: HTMLCanvasElement, width: number, height: number, pixelRatio: number, path: string): void {
+    this.camera = new THREE.PerspectiveCamera(40, width / height, 1, 1000);
+    this.camera.position.z = 200;
 
-	scene = new THREE.Scene();
-  //@ts-ignore
-	scene.fog = new THREE.Fog( 0x444466, 100, 400 );
-  //@ts-ignore
-	scene.background = new THREE.Color( 0x444466 );
+    this.scene = new THREE.Scene();
+    this.scene.fog = new THREE.Fog(0x444466, 100, 400);
+    this.scene.background = new THREE.Color(0x444466);
 
-	group = new THREE.Group();
-	scene.add( group );
+    this.group = new THREE.Group();
+    this.scene.add(this.group);
 
-	// we don't use ImageLoader since it has a DOM dependency (HTML5 image element)
+    const loader = new THREE.ImageBitmapLoader().setPath(path);
+    loader.setOptions({ imageOrientation: 'flipY' });
+    loader.load('../assets/matcap-porcelain-white.jpg', (imageBitmap) => {
+      const texture = new THREE.CanvasTexture(imageBitmap);
 
-	const loader = new THREE.ImageBitmapLoader().setPath( path );
-	loader.setOptions( { imageOrientation: 'flipY' } );
-  console.log("loader called")
-	loader.load( '../assets/matcap-porcelain-white.jpg', function ( imageBitmap ) {
+      const geometry = new THREE.IcosahedronGeometry(5, 8);
+      const materials = [
+        new THREE.MeshMatcapMaterial({ color: 0xaa24df, matcap: texture }),
+        new THREE.MeshMatcapMaterial({ color: 0x605d90, matcap: texture }),
+        new THREE.MeshMatcapMaterial({ color: 0xe04a3f, matcap: texture }),
+        new THREE.MeshMatcapMaterial({ color: 0xe30456, matcap: texture })
+      ];
 
-		const texture = new THREE.CanvasTexture( imageBitmap );
+      for (let i = 0; i < 100; i++) {
+        const material = materials[i % materials.length];
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.x = this.random() * 200 - 100;
+        mesh.position.y = this.random() * 200 - 100;
+        mesh.position.z = this.random() * 200 - 100;
+        mesh.scale.setScalar(this.random() + 1);
+        this.group.add(mesh);
+      }
 
-		const geometry = new THREE.IcosahedronGeometry( 5, 8 );
-		const materials = [
-			new THREE.MeshMatcapMaterial( { color: 0xaa24df, matcap: texture } ),
-			new THREE.MeshMatcapMaterial( { color: 0x605d90, matcap: texture } ),
-			new THREE.MeshMatcapMaterial( { color: 0xe04a3f, matcap: texture } ),
-			new THREE.MeshMatcapMaterial( { color: 0xe30456, matcap: texture } )
-		];
+      this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas });
+      this.renderer.setPixelRatio(pixelRatio);
+      this.renderer.setSize(width, height, false);
+      this.animate();
+    });
+  }
 
-		for ( let i = 0; i < 100; i ++ ) {
+  private animate = (): void => {
+    this.group.rotation.y = -Date.now() / 4000;
 
-			const material = materials[ i % materials.length ];
-			const mesh = new THREE.Mesh( geometry, material );
-			mesh.position.x = random() * 200 - 100;
-			mesh.position.y = random() * 200 - 100;
-			mesh.position.z = random() * 200 - 100;
-			mesh.scale.setScalar( random() + 1 );
-			group.add( mesh );
+    this.renderer.render(this.scene, this.camera);
 
-		}
+    if (self.requestAnimationFrame) {
+      self.requestAnimationFrame(this.animate);
+    }
+  };
 
-    console.log("canvas in scene", canvas);
-
-		renderer = new THREE.WebGLRenderer( { antialias: true, canvas: canvas } );
-    console.log("1")
-		renderer.setPixelRatio( pixelRatio );
-    console.log('2', {width, height});
-		renderer.setSize( width, height, false );
-    console.log('3');
-		animate();
-
-	} );
-
+  private random(): number {
+    const x = Math.sin(this.seed++) * 10000;
+    return x - Math.floor(x);
+  }
 }
 
-function animate() {
-  console.log("animating");
-	// group.rotation.x = Date.now() / 4000;
-	group.rotation.y = - Date.now() / 4000;
-
-	renderer.render( scene, camera );
-
-	if ( self.requestAnimationFrame ) {
-
-		self.requestAnimationFrame( animate );
-
-	} else {
-
-		// Firefox
-
-	}
-
-}
-
-// PRNG
-
-let seed = 1;
-
-function random() {
-
-	const x = Math.sin( seed ++ ) * 10000;
-
-	return x - Math.floor( x );
-
-}
-
-export default init;
+export default Scene;

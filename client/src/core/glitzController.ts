@@ -1,4 +1,5 @@
-import initScene from './scene';
+import Scene from './scene';
+
 
 
 // self.onmessage = function(message) {
@@ -17,9 +18,10 @@ export async function init(data: any) {
   const width = data.innerWidth;
   const height = data.innerHeight;
   const pixelRatio = data.devicePixelRatio;
+  const sceneInstance = new Scene();
 
   console.log('init scene called');
-  initScene(data.canvas, width, height, pixelRatio, './' );
+  sceneInstance.init(data.canvas, width, height, pixelRatio, './' );
   const autoRender = {value: true};
   const mouse = {baseX: -.1, x: 0, baseY: 0, y: 0};
 
