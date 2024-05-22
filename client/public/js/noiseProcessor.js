@@ -4,6 +4,7 @@ class NoiseProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.port.onmessage = (event) => {
+      console.log("worklet event", {event});
       if(event.data === 'initialize'){
         this.workerPort = event.ports[0];
       }

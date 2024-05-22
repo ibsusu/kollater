@@ -1,17 +1,32 @@
 import * as THREE from 'three';
-import {updateSoundAndTouchHistory} from './glitzHistory';
+import {GlitzState, updateSoundAndTouchHistory} from './glitzHistory';
+import { HistoryTexture } from './HistoryTexture';
 class Scene {
   private camera!: THREE.PerspectiveCamera;
   private scene!: THREE.Scene;
   private renderer!: THREE.WebGLRenderer;
   private group!: THREE.Group;
   private seed: number;
+	private state!: GlitzState;
+
 
   constructor() {
     this.seed = Math.floor(Math.random()*100);
   }
 
-  public init(canvas: HTMLCanvasElement, width: number, height: number, pixelRatio: number, path: string): void {
+  public init(canvas: HTMLCanvasElement, width: number, height: number, pixelRatio: number, path: string) {
+		//@ts-ignore
+		this.state = {}
+
+		this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas });
+		this.renderer.setPixelRatio(pixelRatio);
+		this.renderer.setSize(width, height, false);
+		
+		let context = this.renderer.getContext();
+
+		this.state.numSoundSamples = Math.min(context.MAX_TEXTURE_SIZE, 1024);
+    this.state.numHistorySamples =  60 * 4; // 4 seconds;
+
     this.camera = new THREE.PerspectiveCamera(40, width / height, 1, 1000);
     this.camera.position.z = 200;
 
@@ -45,18 +60,42 @@ class Scene {
         this.group.add(mesh);
       }
 
-      this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas });
-      this.renderer.setPixelRatio(pixelRatio);
-      this.renderer.setSize(width, height, false);
+			this.state.volumeHistory = new HistoryTexture(this.renderer, {
+				width: 4,
+				length: this.state.numHistorySamples,
+				format: THREE.AlphaFormat
+			});
+			this.state.soundHistory = new HistoryTexture(this.renderer, {
+        width: this.state.numSoundSamples,
+        length: this.state.numHistorySamples,
+        format: THREE.AlphaFormat,
+      });
+			// if (this.state.canUseFloat && this.statecanRenderToFloat) {
+      //   var floatFilter = this.state.canFilterFloat ? THREE.LinearFilter : THREE.NearestFilter;
+      //   this.state.floatSoundHistory = new HistoryTexture(this.renderer, {
+      //     width: this.state.numSoundSamples,
+      //     length: this.state.numHistorySamples,
+      //     min: floatFilter,
+      //     mag: floatFilter,
+      //     format: gl.ALPHA,
+      //     type: gl.FLOAT,
+      //   });
+      // }
+
       this.animate();
     });
+
+		return this.renderer;
   }
 
   private animate = (): void => {
     this.group.rotation.y = -Date.now() / 4000;
+		updateSoundAndTouchHistory(this.state);
+		var volumeHistoryTex = this.state.volumeHistory.getTexture();
+		var touchHistoryTex = this.state.touchHistory.getTexture();
+		var historyTex = this.state.soundHistory.getTexture();
 
     this.renderer.render(this.scene, this.camera);
-
     if (self.requestAnimationFrame) {
       self.requestAnimationFrame(this.animate);
     }

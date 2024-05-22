@@ -139,7 +139,6 @@ export async function init() {
   await filer.init((workManager as CoreWorker));
   comms.test();
   window.dispatchEvent(initializedEvent);
-
 }
 
 

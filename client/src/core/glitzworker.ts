@@ -1,4 +1,4 @@
-import {init} from './glitzController';
+import {glitzController} from './glitzController';
 import {UIController} from './uiController';
 
 class ProxyManager {
@@ -33,7 +33,8 @@ async function start(data: any) {
   proxy.ownerDocument = proxy; // HACK!
   //@ts-ignore
   self.document = {};  // HACK!
-  proxy.glitzern.push(await init({
+
+  proxy.glitzern.push(await glitzController.init({
     element: proxy,
     canvas: data.canvas,
     inputElement: proxy,
@@ -43,8 +44,6 @@ async function start(data: any) {
     screenHeight: data.screenHeight,
     devicePixelRatio: data.devicePixelRatio
   }));
-  // console.log("program", (await program).uniforms.iMouse.value[0]);
-  // program.uniforms.iMouse.value[0] = 800;
 }
 
 function makeProxy(data: any) {
@@ -64,12 +63,17 @@ self.onmessage = function(e) {
   if (typeof fn !== 'function') {
     if(e.data?.reason === 'initialize'){
       let port = e.data.port;
+      glitzController.setPort(port);
+
       //@ts-ignore
       port.onmessage = (ev) => {
-
+        
         // console.log("worker recieved audio data", ev.data);
       }
       return;
+    }
+    if(e.data?.reason === 'audioReady') {
+      glitzController.getSharedBuffers();
     }
     throw new Error('no handler for type: ' + e.data.type);
   }

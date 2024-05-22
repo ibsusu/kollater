@@ -2,16 +2,20 @@ import * as THREE from 'three';
 
 interface HistoryTextureOptions {
   width: number;
+  length?: number;
   type?: THREE.TextureDataType;
-  format?: THREE.PixelFormat;
+  format?: THREE.PixelFormat; // WebGLRenderingContextBase.ALPHA, etc.
   min?: THREE.TextureFilter;
   mag?: THREE.MagnificationTextureFilter;
-  length: number;
   historyFormat?: THREE.PixelFormat;
 }
 
 export class HistoryTexture {
-  private buffer: Uint8Array;
+  sharedBuffer: SharedArrayBuffer;
+  sharedArray: Uint8Array | Float32Array;
+  buffer: Uint8Array;
+  floatBuffer!: Float32Array;
+  numSamples: number = 60*4; // 4 seconds
   private srcRenderTarget: THREE.WebGLRenderTarget;
   private dstRenderTarget: THREE.WebGLRenderTarget;
   private texture: THREE.DataTexture;
@@ -24,11 +28,12 @@ export class HistoryTexture {
     const width = options.width;
     const type = options.type || THREE.UnsignedByteType;
     const format = options.format || THREE.RGBAFormat;
-    const length = options.length;
 
     // Create data buffer and texture
     const size = width * 4; // Assuming RGBA
     this.buffer = new Uint8Array(size);
+    this.sharedBuffer = new SharedArrayBuffer(size);
+    this.sharedArray = type ===  THREE.FloatType ? new Float32Array(this.sharedBuffer) : new Uint8Array(this.sharedBuffer);
     this.texture = new THREE.DataTexture(this.buffer, width, 1, format, type);
     this.texture.minFilter = options.min || THREE.LinearFilter;
     this.texture.magFilter = options.mag || THREE.LinearFilter;

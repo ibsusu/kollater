@@ -40,10 +40,12 @@ export type GlitzState = {
   analyser: Analyser;
   soundHistory: HistoryTexture;
   volumeHistory: HistoryTexture;
-  touchHistory: TouchHistory;
+  touchHistory: HistoryTexture;
   floatSoundHistory?: HistoryTexture;
   historyProgramInfo: HistoryProgramInfo;
   quadBufferInfo: QuadBufferInfo;
+  numSoundSamples: number;
+  numHistorySamples: number;
   maxSample: number;
   sum: number;
   maxDif: number;
