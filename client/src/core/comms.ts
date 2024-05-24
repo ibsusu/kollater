@@ -9,7 +9,6 @@ import {stringify as uuidStringify, parse as uuidParse, v4 as uuidv4, validate a
 
 import { Queue } from '@datastructures-js/queue';
 
-console.log("commsworker!!", import.meta.env);
 const WS_URL = "wss://"+ (import.meta.env.DEV ? 'kollator.local:8000' : 'kollator.com');
 console.log({WS_URL});
 interface RegistrationData {
@@ -287,7 +286,7 @@ class CommsWorker {
     console.log("finished bootstrapping webrtc connection, greeting");
   }
   test() {
-    console.log("commsworker test");
+    // console.log("commsworker test");
   }
 
   setUploading(peer: KPeer) {
@@ -326,12 +325,10 @@ class CommsWorker {
     return uploadingPromise;
   }
 }
-console.log("before new commsworker");
+
 //@ts-ignore
 window.signalingData = [];
 let comms = new CommsWorker();
-
-console.log("after new commsworker");
 
 export {comms};
 export {CommsWorker};

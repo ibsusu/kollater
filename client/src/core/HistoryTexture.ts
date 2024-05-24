@@ -26,6 +26,7 @@ export class HistoryTexture {
 
   constructor(private renderer: THREE.WebGLRenderer, options: HistoryTextureOptions) {
     const width = options.width;
+    const length = options.length;
     const type = options.type || THREE.UnsignedByteType;
     const format = options.format || THREE.RGBAFormat;
 

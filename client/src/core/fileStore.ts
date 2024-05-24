@@ -200,7 +200,7 @@ export const useFiler = () => {
       window.removeEventListener('importedFile', handleimportedFile);
     }
   }, []);
-  console.log("all files", {files});
+  // console.log("all files", {files});
   return files;
 }
 

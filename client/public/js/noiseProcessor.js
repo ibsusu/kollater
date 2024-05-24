@@ -33,10 +33,10 @@ class NoiseProcessor extends AudioWorkletProcessor {
     }
 
     if(inputChannel.length){
-      if(this.workerPort) 
-        this.workerPort.postMessage([inputChannel.slice(0), inputChannel2]); // Send audio data to the main thread
-      else
-        this.port.postMessage([inputChannel.slice(0), inputChannel2]); // Send audio data to the main thread
+      // if(this.workerPort) 
+      //   this.workerPort.postMessage([inputChannel.slice(0), inputChannel2]); // Send audio data to the main thread
+      // else
+      // this.port.postMessage([inputChannel.slice(0), inputChannel2]); // Send audio data to the main thread
     }
     return true;
   }

@@ -1,4 +1,4 @@
-import {init} from './glitzController.ts';
+import {glitzController} from './glitzController.ts';
 import {UIController} from './uiController.ts';
 // import {type GlitzWorker} from './glitzWorker';
 // export {type GlitzWorker} from './glitzWorker';
@@ -110,7 +110,7 @@ class ElementProxy {
     sendSize();
 
     for (const [eventName, handler] of Object.entries(eventHandlers)) {
-      console.log("addeventListener", element, eventName);
+      // console.log("addeventListener", element, eventName);
       if(eventName === 'pointerUp') 
       element.addEventListener(eventName, function(event: any) {
         //@ts-ignore
@@ -148,7 +148,6 @@ class ElementProxy {
 }
 
 export function startWorker(canvas: HTMLCanvasElement, messagePort: MessagePort) {
-  console.log("startworker");
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
   canvas.focus();
@@ -206,7 +205,7 @@ export async function startMainPage(canvas: HTMLCanvasElement, messagePort: Mess
   controller.height = canvas.height;
 
   // console.log("controller wh, window wh", controller.width, controller.height, window.innerWidth, window.innerHeight);
-  controller.glitzern.push(await init({
+  controller.glitzern.push(await glitzController.init({
     element: window,
     canvas,
     inputElement: canvas,

@@ -122,7 +122,7 @@ class CoreWorker {
   }
 
   async init(id: number){
-    console.log("initializing worker:", id);
+    // console.log("initializing worker:", id);
     this.id = id;
     return true;
   }

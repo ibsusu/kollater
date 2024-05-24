@@ -64,17 +64,9 @@ self.onmessage = function(e) {
     if(e.data?.reason === 'initialize'){
       let port = e.data.port;
       glitzController.setPort(port);
-
-      //@ts-ignore
-      port.onmessage = (ev) => {
-        
-        // console.log("worker recieved audio data", ev.data);
-      }
       return;
     }
-    if(e.data?.reason === 'audioReady') {
-      glitzController.getSharedBuffers();
-    }
+
     throw new Error('no handler for type: ' + e.data.type);
   }
   
