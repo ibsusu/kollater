@@ -28,10 +28,6 @@ export default defineConfig({
     esbuildOptions: {
       target: 'esnext'
     },
-    exclude: [
-      'three', // to prevent Vite's code chunking which causes an error,
-      'scene.ts'
-    ]
   },
   define: {
     global: "self",

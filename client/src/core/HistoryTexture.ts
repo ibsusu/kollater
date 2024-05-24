@@ -1,5 +1,3 @@
-import * as THREE from 'three';
-
 interface HistoryTextureOptions {
   width: number;
   length?: number;

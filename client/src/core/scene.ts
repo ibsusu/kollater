@@ -1,18 +1,5 @@
-import * as THREE from 'three';
-import WebGPU from 'three/addons/capabilities/WebGPU.js';
-import WebGL from 'three/addons/capabilities/WebGL.js';
-import { TeapotGeometry } from 'three/addons/geometries/TeapotGeometry.js';
-
-import InstancedPointsGeometry from 'three/addons/geometries/InstancedPointsGeometry.js';
-
-import InstancedPoints from 'three/addons/objects/InstancedPoints.js';
-
-
-import { MeshStandardNodeMaterial, NodeUpdateType, Node, nodeObject, uniform, NodeFrame, CubeTextureNode, cubeTexture } from 'three/nodes';
-
 import { HistoryTexture } from './HistoryTexture';
-import WebGPURenderer from 'three/examples/jsm/renderers/webgpu/WebGPURenderer.js';
-import { GeometryUtils } from 'three/examples/jsm/Addons.js';
+
 // import {headerShader} from './shaders';
 
 const settings = {

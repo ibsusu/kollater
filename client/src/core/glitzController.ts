@@ -1,4 +1,3 @@
-import { WebGLRenderer, LinearFilter, NearestFilter, FloatType, AlphaFormat } from 'three';
 import { HistoryTexture } from './HistoryTexture';
 import Scene from './scene';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
