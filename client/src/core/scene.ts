@@ -1,6 +1,7 @@
 import { Entity } from './glitzEntity';
 // import { GlitzGroup} from './glitzGroup';
-import { Renderer, Transform, Camera, Vec2, Vec4 } from 'ogl';
+import { Renderer, Transform, Camera, Vec2, Vec4, Texture } from 'ogl';
+
 // import { getVertexEyesShader } from './shaders';
 
 type TypedArray = Uint8Array | Float32Array | Int32Array | Uint16Array | Float64Array;
@@ -36,8 +37,8 @@ class Scene {
 		this.devicePixelRatio = pixelRatio;
 		const c = canvas as HTMLCanvasElement;
 		this.renderer = new Renderer({canvas: c, width, height});
-  //  this.renderer.gl.clearColor(.5,.5,.5,0);
-    this.renderer.gl.clearColor(1, 1, 1, 1);
+   this.renderer.gl.clearColor(.5,.5,.5,0);
+    // this.renderer.gl.clearColor(1, 1, 1, 1);
 
 		// this.camera = new Camera(this.renderer.gl, {
 		// 	fov: 70,
@@ -60,22 +61,53 @@ class Scene {
   public async init() {
     if(!this.sharedData.sound) throw "Sound must be set as a sharedArrayBuffer before scene can be initialized";
 		this.soundSampleCount = Math.min(this.soundSampleCount, this.renderer.gl.getParameter(this.renderer.gl.MAX_TEXTURE_SIZE));
-		const vertexCount = 100;
-    let vertexIds = new Float32Array(vertexCount);
+		const vertexCount = 1200;
+    let vertexIds = new Float32Array(vertexCount*4);
     for(let i=0;i<vertexIds.length;++i){
       vertexIds[i] = i;
     }
     this.mutex = new Int32Array(this.sharedData.mutex);
+    const numParticles = 65536;
+    let gl = this.renderer.gl;
+    let textureSize = getMinumTextureSize(this.sharedData.sound.byteLength);
+    let volume = new Texture(this.renderer.gl, {
+      image: new Float32Array(this.sharedData.sound.byteLength*4),
+      width: textureSize,
+      type: gl.FLOAT,
+      format: gl.RGBA,
+      internalFormat: gl.renderer.isWebgl2 ? gl.RGBA32F : gl.RGBA,
+      wrapS: gl.CLAMP_TO_EDGE,
+      wrapT: gl.CLAMP_TO_EDGE,
+      generateMipmaps: false,
+      minFilter: gl.NEAREST,
+      magFilter: gl.NEAREST,
+      flipY: false,
+    });
+    let sound = new Texture(this.renderer.gl, {
+      image: new Float32Array(this.sharedData.sound.byteLength*4),
+      width: textureSize,
+      type: gl.FLOAT,
+      format: gl.RGBA,
+      internalFormat: gl.renderer.isWebgl2 ? gl.RGBA32F : gl.RGBA,
+      wrapS: gl.CLAMP_TO_EDGE,
+      wrapT: gl.CLAMP_TO_EDGE,
+      generateMipmaps: false,
+      minFilter: gl.NEAREST,
+      magFilter: gl.NEAREST,
+      flipY: false,
+    });
 
 		this.uniforms = {
-			mouse: {value: new Vec2(0,0)},
+			mouse: {value: new Vec2(0.2,0.5)},
 			resolution: {value: new Vec2(this.renderer.width, this.renderer.height)},
 			background: {value: new Vec4(200,200,200,200)},
 			time: {value: 10.0},
 			vertexCount: {value: vertexCount},
       // vertexId: {value: vertexIds},
 			// volume: {value: new Uint8Array(this.sharedData.volume)},
-			// sound: {value: this.canHandleFloat? new Float32Array(this.sharedData.sound.byteLength / 4) : new Uint8Array(this.sharedData.sound.byteLength)},
+			// sound: {value: this.canHandleFloat? new Float32Array(this.sharedData.sound.byteLength) : new Uint8Array(this.sharedData.sound.byteLength)},
+			volume: {value: volume},
+			sound: {value: sound},
       _dontUseDirectly_pointSize: {value: 1},
 		};
 
@@ -102,7 +134,7 @@ class Scene {
 		this.time = time;
 
     this.uniforms.time.value = time;
-    this.entities[0].mesh.program.uniforms.uTime.value = this.time *0.001;
+    // this.entities[0].mesh.program.uniforms.uTime.value = this.time *0.001;
 		this.renderer.render({scene: this.scene, camera: this.camera});
 		// this.updateSoundAndTouchHistory();
   };
@@ -132,6 +164,10 @@ class Scene {
 	// 	}
 	// 	// this.touchHistory.update();
 	// }
+}
+
+function getMinumTextureSize(arraySize: number){
+  return Math.pow(2, Math.ceil(Math.log(Math.ceil(Math.sqrt(arraySize))) / Math.LN2));
 }
 
 export default Scene;

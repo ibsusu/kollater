@@ -11,8 +11,10 @@ export interface EntityParams {
 };
 
 const defaultProgramOptions = {
-  vertex: particleVertexShader, //getVertexEyesShader(),
-  fragment: particleFragmentShader
+  // vertex: particleVertexShader, //getVertexEyesShader(),
+  // fragment: particleFragmentShader
+  vertex: getVertexEyesShader(),
+  fragment: fragmentShader
 };
 
 export class Entity {
@@ -33,35 +35,42 @@ export class Entity {
     this.gl = gl;
     this.points = points;
     this.scene = scene;
-    this.count = count ?? 1;
+    this.count = count ?? 2000;
     this.uniforms = uniforms;
     this.programOptions = programOptions ?? defaultProgramOptions;
-    this.geometryOptions = geometryOptions ?? {position:{size:3, data: new Float32Array(this.count*3)}};
+    this.geometryOptions = geometryOptions ?? {position:{size:3, data: new Float32Array(this.count*4)}};
   }
 
   async init() {
-    let vertexIds = new Float32Array(100);
+    console.log("entity count", this.count);
+    let vertexIds = new Float32Array(this.count*9);
     for(let i=0;i<vertexIds.length;++i){
       vertexIds[i] = i;
     }
-    const num = 100;
-    const position = new Float32Array(num * 3);
-    const random = new Float32Array(num * 4);
+    console.log("vertexId count", vertexIds.length);
+    // const num = 100;
+    // const position = new Float32Array(num * 3);
+    // const random = new Float32Array(num * 4);
 
-    for (let i = 0; i < num; i++) {
-        position.set([Math.random(), Math.random(), Math.random()], i * 3);
-        random.set([Math.random(), Math.random(), Math.random(), Math.random()], i * 4);
-    }
-
-    let geometry = new Geometry(this.gl, {...this.geometryOptions, random: { size: 4, data: random },vertexId: {size:4, data: vertexIds}});
-    console.log("entityUniforms", this.uniforms);
-    // let program = new Program(this.gl, {...this.programOptions, uniforms: this.uniforms});
+    // for (let i = 0; i < num; i++) {
+    //     position.set([Math.random(), Math.random(), Math.random()], i * 3);
+    //     random.set([Math.random(), Math.random(), Math.random(), Math.random()], i * 4);
+    // }
+    console.log({geops: this.geometryOptions});
+    let geometry = new Geometry(this.gl, {...this.geometryOptions, vertexId: {size:4, data: vertexIds}});
+    // console.log("entityUniforms", this.uniforms);
     let program = new Program(this.gl, {
-      ...this.programOptions,
+      ...this.programOptions, 
       transparent: true,
       depthTest: false,
-      uniforms: {uTime: {value: 0}}
+      uniforms: this.uniforms,
     });
+    // let program = new Program(this.gl, {
+    //   ...this.programOptions,
+    //   transparent: true,
+    //   depthTest: false,
+    //   uniforms: {uTime: {value: 0}}
+    // });
 
     if(this.points) {
       this.mesh = new Mesh(this.gl, {mode: this.gl.POINTS, geometry, program})
