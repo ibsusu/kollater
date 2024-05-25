@@ -8,7 +8,7 @@ uniform float time;
 uniform float vertexCount;
 uniform sampler2D volume;
 uniform sampler2D sound;
-uniform sampler2D floatSound;
+// uniform sampler2D floatSound;
 uniform sampler2D touch;
 uniform vec2 soundRes;
 uniform float _dontUseDirectly_pointSize;
@@ -31,6 +31,76 @@ export function applyTemplateToShader(src: string) {
   }
   return vsrc;
 }
+
+export const particleVertexShader = /* glsl */ `
+    attribute vec3 position;
+    attribute vec4 random;
+
+    uniform mat4 modelMatrix;
+    uniform mat4 viewMatrix;
+    uniform mat4 projectionMatrix;
+    uniform float uTime;
+
+    varying vec4 vRandom;
+
+    void main() {
+        vRandom = random;
+
+        // positions are 0->1, so make -1->1
+        vec3 pos = position * 2.0 - 1.0;
+
+        // Scale towards camera to be more interesting
+        pos.z *= 10.0;
+
+        // modelMatrix is one of the automatically attached uniforms when using the Mesh class
+        vec4 mPos = modelMatrix * vec4(pos, 1.0);
+
+        // add some movement in world space
+        float t = uTime * 0.6;
+        mPos.x += sin(t * random.z + 6.28 * random.w) * mix(0.1, 10., random.x);
+        mPos.y += sin(t * random.y + 6.28 * random.x) * mix(0.1, 10., random.w);
+        mPos.z += sin(t * random.w + 6.28 * random.y) * mix(0.1, 1.5, random.z);
+
+        // get the model view position so that we can scale the points off into the distance
+        vec4 mvPos = viewMatrix * mPos;
+        gl_PointSize = 300.0 / length(mvPos.xyz) * (random.x + 0.1);
+        gl_Position = projectionMatrix * mvPos;
+    }
+`;
+
+export const particleFragmentShader =`
+precision highp float;
+
+uniform float uTime;
+
+varying vec4 vRandom;
+
+void main() {
+    vec2 uv = gl_PointCoord.xy;
+
+    float circle = smoothstep(0.5, 0.4, length(uv - 0.5)) * 0.8;
+
+    gl_FragColor.rgb = 0.8 + 0.2 * sin(uv.yxx + uTime + vRandom.y * 6.28) + vec3(0.1, 0.0, 0.3);
+    gl_FragColor.a = circle;
+}`;
+
+export const basicVertexShader =`
+  // in vec3 position;
+  // in vec2 uv;
+
+  // uniform mat4 modelViewMatrix;
+  // uniform mat4 projectionMatrix;
+  // uniform float rotation;
+
+  // out vec2 vUv;
+  // out float vRotation;
+
+  void main() {
+    // vRotation = rotation;
+    // vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+  }
+`;
 
 const eyeShader = `
 #define PI radians(180.)
@@ -73,7 +143,8 @@ void main() {
   float seg = floor(vertexId/len);
   float segId = mod(vertexId,len);
   float v = texture2D(volume, vec2(1., (1.+seg)/amount*240.)).a;
-  float s = texture2D(floatSound, vec2(1., (1.+segId)/len*240.)).a;
+  float s = texture2D(sound, vec2(1., (1.+segId)/len*240.)).a;
+  // float s = texture2D(floatSound, vec2(1., (1.+segId)/len*240.)).a;
   vec3 p = vec3(vertexId * 0.005, seg, time*0.1 - segId*0.001);
   float n = noise(p);
   float x = cos(vertexId/vertexCount * PI * 2.)*(v*radius+segId*0.001);
@@ -125,6 +196,16 @@ void main() {
 }
 `;
 
-export function getEyesShader() {
+export function getVertexEyesShader() {
   return applyTemplateToShader(eyeShader);
 }
+
+export const fragmentShader =`
+precision mediump float;
+
+varying vec4 v_color;
+
+void main() {
+  gl_FragColor = v_color;
+}
+`;

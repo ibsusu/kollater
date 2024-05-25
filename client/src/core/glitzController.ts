@@ -1,18 +1,15 @@
-import { HistoryTexture } from './HistoryTexture';
+import { Renderer } from 'ogl';
 import Scene from './scene';
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 export class GlitzController {
-  private renderer: WebGLRenderer | null = null;
-  private context: WebGLRenderingContext | WebGL2RenderingContext | null = null;
+  private renderer!: Renderer;
+  private scene!: Scene;
+  private gl!: WebGLRenderingContext;
   private mutexBuffer: SharedArrayBuffer = new SharedArrayBuffer(4);
   private mutex!: Int32Array;
-  private volumeHistory: HistoryTexture | null = null;
-  private soundHistory: HistoryTexture | null = null;
-  private floatSoundHistory: HistoryTexture | null = null;
   private autoRender = { value: true };
   private mouse = { baseX: -.1, x: 0, baseY: 0, y: 0 };
   private maxTextureSize!: number;
+  private canHandleFloat = false;
   messagePort!: MessagePort;
   connectedAudio: boolean = false;
   audioCheckInterval!: number;
@@ -26,44 +23,17 @@ export class GlitzController {
     const height = data.innerHeight;
     const pixelRatio = data.devicePixelRatio;
 
-    const scene = new Scene();
+    this.scene = new Scene({canvas: data.canvas, width, height, pixelRatio});
     console.log('init scene called');
-    this.renderer = await scene.init(data.canvas, width, height, pixelRatio, './' );
-    this.context = this.renderer.getContext();
-    const canUseFloat = false;//this.checkCanUseFloat(this.context);
-    const canRenderToFloat = false;//this.checkCanRenderToFloat(this.renderer);
-    const canFilterFloat = canUseFloat && this.context.getExtension("OES_texture_float_linear");
-    this.maxTextureSize = 1024; //this.context.MAX_TEXTURE_SIZE;
-    const numSoundSamples = 128;//Math.min(this.maxTextureSize, 1024);
-    const numHistorySamples = 60 * 4;
-    
-    this.volumeHistory = new HistoryTexture(this.renderer, {
-      width: 4,
-      length: numHistorySamples,
-      format: AlphaFormat
-    });
-    scene.volumeHistory = this.volumeHistory
+    this.renderer = this.scene.renderer;
+    this.gl = this.scene.renderer.gl;
+    this.canHandleFloat = this.checkCanHandleFloat(this.gl);
+    const canRenderToFloat = true;//this.checkCanRenderToFloat(this.renderer);
+    const canFilterFloat = true;//this.canHandleFloat && this.gl.getExtension("OES_texture_float_linear");
+    this.maxTextureSize = this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE);
+    const numSoundSamples = 128;
 
-    this.soundHistory = new HistoryTexture(this.renderer, {
-      width: numSoundSamples,
-      length: numHistorySamples,
-      format: AlphaFormat
-    });
-    scene.soundHistory = this.soundHistory;
-
-    console.log({canUseFloat, canRenderToFloat});
-    if (canUseFloat && canRenderToFloat) {
-      const floatFilter = canFilterFloat ? LinearFilter : NearestFilter;
-      this.floatSoundHistory = new HistoryTexture(this.renderer, {
-        width: numSoundSamples,
-        length: numHistorySamples,
-        min: floatFilter,
-        mag: floatFilter,
-        format: AlphaFormat,
-        type: FloatType,
-      });
-      scene.floatSoundHistory = this.floatSoundHistory;
-    }
+    console.log({canHandleFloat: this.canHandleFloat, canRenderToFloat});
 
     this.checkForAudioConnection();
     // this.loop();
@@ -72,17 +42,6 @@ export class GlitzController {
       autoRender: this.autoRender,
       mouse: this.mouse,
     };
-  }
-
-  async loop(){
-    // console.log("loop");
-    //@ts-ignore 2339
-    // let res = Atomics.waitAsync(this.mutex, 0, 1);
-    // console.log("loop res", await res.value);
-    // console.log(this.soundHistory!.buffer);
-    // Atomics.store(this.mutex, 0, 1);
-    // sleep(100);
-    // this.loop();
   }
 
   checkForAudioConnection() {
@@ -103,15 +62,11 @@ export class GlitzController {
 
   handleMessage(ev: MessageEvent){
     console.log("glitzController handle Message", ev);
-    if(ev.data.reason === 'audioConnected'){
-      this.soundHistory!.sharedBuffer = new SharedArrayBuffer(Math.min(ev.data.frequencyBinCount, this.maxTextureSize));
-      this.soundHistory!.sharedArray = new Uint8Array(this.soundHistory!.sharedBuffer);
-      if(this.floatSoundHistory){
-        //@ts-ignore ts(2339)
-        this.floatSoundHistory.sharedBuffer = new SharedArrayBuffer(Math.min(ev.data.frequencyBinCount, this.maxTextureSize));
-        this.floatSoundHistory.sharedArray = new Float32Array(this.floatSoundHistory.sharedBuffer);
-      }
+    if(ev.data.reason === 'audioConnected' && !this.connectedAudio){
       this.connectedAudio = true;
+      this.scene.canHandleFloat = this.canHandleFloat;
+      this.scene.sharedData.sound = new SharedArrayBuffer(this.maxTextureSize);
+      this.scene.init();
       this.sendSharedBuffers();
     }
   }
@@ -123,10 +78,9 @@ export class GlitzController {
   sendSharedBuffers(){
     this.messagePort.postMessage({
       reason: "sharedBuffers",
-      mutexBuffer: this.mutexBuffer,
-      volumeBuffer: this.volumeHistory!.sharedBuffer,
-      soundBuffer: this.soundHistory!.sharedBuffer,
-      floatSoundBuffer: this.floatSoundHistory?.sharedBuffer,
+      mutexBuffer: this.scene.sharedData.mutex,
+      volumeBuffer: this.scene.sharedData.volume,
+      soundBuffer: this.scene.sharedData.sound,
     });
   }
 
@@ -135,13 +89,13 @@ export class GlitzController {
     // Implement the three.js method to resize the renderer and adjust camera perspective
   }
 
-  private checkCanUseFloat(gl: WebGLRenderingContext | WebGL2RenderingContext) {
+  private checkCanHandleFloat(gl: WebGLRenderingContext | WebGL2RenderingContext) {
     console.log("checkCanUseFloat", gl, gl.getExtension("OES_texture_float"));
     return gl.getExtension("OES_texture_float") ? true : false;
   }
 
-  private checkCanRenderToFloat(renderer: WebGLRenderer) {
-    const gl = renderer.getContext();
+  private checkCanRenderToFloat(renderer: Renderer) {
+    const gl = renderer.gl;
 
     // Create a floating-point texture
     const floatTexture = gl.createTexture();
