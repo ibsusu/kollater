@@ -24,7 +24,7 @@ export class GlitzController {
     const pixelRatio = data.devicePixelRatio;
 
     this.scene = new Scene({canvas: data.canvas, width, height, pixelRatio});
-    console.log('init scene called');
+    console.log('init scene called', pixelRatio);
     this.renderer = this.scene.renderer;
     this.gl = this.scene.renderer.gl;
     this.canHandleFloat = this.checkCanHandleFloat(this.gl);

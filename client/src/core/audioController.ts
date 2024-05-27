@@ -21,6 +21,8 @@ export class AudioController {
   private workletMutex!: Int32Array;
   private mutexBuffer!: SharedArrayBuffer;
   private mutex!: Int32Array;
+  private floatFreqs: Float32Array = new Float32Array(4096*4);
+  private volumeBytes: Uint8Array = new Uint8Array(4);
   volumeBuffer!: SharedArrayBuffer// shared buffers require secure context. we always run on https
   soundBuffer!: SharedArrayBuffer;
   floatSoundBuffer!: SharedArrayBuffer;
@@ -42,6 +44,7 @@ export class AudioController {
   }
 
   async init(url: string=defaultMusicUrl, messagePort?: MessagePort): Promise<void> {
+
     this.messagePort = messagePort;
     if(this.messagePort){
       this.messagePort.onmessage = this.handleWorkerMessage.bind(this);
@@ -53,6 +56,7 @@ export class AudioController {
     }
     const arrayBuffer = await response.arrayBuffer();
     this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+    this.saveMaxSample(this.audioBuffer);
   }
 
   firstStart() {
@@ -164,17 +168,40 @@ export class AudioController {
     if(Atomics.load(this.mutex, 0) === 0){
       console.log({mutex: this.mutex});
       this.analyserNode.getByteFrequencyData(this.soundArraySwapper);
-      console.log("analyseAudio", this.soundArray);
+
+      this.analyserNode.getFloatFrequencyData(this.floatFreqs);
+      console.log("analyseAudio", this.floatFreqs);
+
+      const buf = this.floatFreqs;
+      const len = buf.length;
+      var max = 0;
+      for (let ii = 0; ii < len; ++ii) {
+        const v = buf[ii];
+        if (v > max) {
+          max = v;
+        }
+      }
+
+      this.volumeBytes[3] = max;
+
+      this.volumeBytes[0] = Math.abs(this.maxSample) * 255;
+      this.volumeBytes[1] = this.sum * 255;
+      this.volumeBytes[2] = this.maxDif * 127;
+
+
+
       this.soundArray.set(this.soundArraySwapper);
       Atomics.store(this.mutex, 0, 1);
     }
     if(this.isPlaying){
+      this.analyserNode.getFloatFrequencyData(this.floatFreqs);
+      console.log("analyseAudio", this.floatFreqs);
       requestAnimationFrame(this.analyseAudio.bind(this));
     }
   }
 
-  saveMaxSample(e: any){ // TODO,
-    const buf = e.inputBuffer.getChannelData(0);
+  saveMaxSample(audioBuffer: AudioBuffer){ // TODO,
+    const buf = audioBuffer.getChannelData(0);
     const len = buf.length;
     var last = buf[0];
     var max = buf[0];
@@ -194,6 +221,7 @@ export class AudioController {
     this.maxSample = max;
     this.maxDif = maxDif;
     this.sum = Math.sqrt(sum / len);
+    console.log("maxSample", this.maxSample, this.maxDif, this.sum);
   }
 
   toggleMute() {

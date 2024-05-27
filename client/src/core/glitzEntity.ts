@@ -1,5 +1,5 @@
 import {AttributeMap, Geometry, Mesh, OGLRenderingContext, Program, ProgramOptions, Transform, Vec3} from 'ogl';
-import { getVertexEyesShader, fragmentShader, particleFragmentShader, particleVertexShader } from './shaders';
+import { getVertexEyesShader, fragmentShader, eyesVShader, particleFragmentShader, particleVertexShader } from './shaders';
 export interface EntityParams {
   gl: OGLRenderingContext,
   scene: Transform,
@@ -13,7 +13,7 @@ export interface EntityParams {
 const defaultProgramOptions = {
   // vertex: particleVertexShader, //getVertexEyesShader(),
   // fragment: particleFragmentShader
-  vertex: getVertexEyesShader(),
+  vertex: eyesVShader,//getVertexEyesShader(),
   fragment: fragmentShader
 };
 
@@ -38,33 +38,29 @@ export class Entity {
     this.count = count ?? 2000;
     this.uniforms = uniforms;
     this.programOptions = programOptions ?? defaultProgramOptions;
-    this.geometryOptions = geometryOptions ?? {position:{size:3, data: new Float32Array(this.count*4)}};
+    this.geometryOptions = geometryOptions ?? {position:{size:1, data: new Float32Array(this.count*3)}};
   }
 
   async init() {
     console.log("entity count", this.count);
-    let vertexIds = new Float32Array(this.count*9);
+    let vertexIds = new Float32Array(this.count*3.2);
     for(let i=0;i<vertexIds.length;++i){
       vertexIds[i] = i;
     }
     console.log("vertexId count", vertexIds.length);
-    // const num = 100;
-    // const position = new Float32Array(num * 3);
-    // const random = new Float32Array(num * 4);
+    console.log({geops: this.geometryOptions, uniforms: this.uniforms});
 
-    // for (let i = 0; i < num; i++) {
-    //     position.set([Math.random(), Math.random(), Math.random()], i * 3);
-    //     random.set([Math.random(), Math.random(), Math.random(), Math.random()], i * 4);
-    // }
-    console.log({geops: this.geometryOptions});
-    let geometry = new Geometry(this.gl, {...this.geometryOptions, vertexId: {size:4, data: vertexIds}});
-    // console.log("entityUniforms", this.uniforms);
+    let geometry = new Geometry(this.gl, {...this.geometryOptions, vertexId: {size:1, data: vertexIds}});
+    console.log("entityUniforms", this.uniforms);
+
     let program = new Program(this.gl, {
       ...this.programOptions, 
-      transparent: true,
-      depthTest: false,
+      transparent: false,
+      depthTest: true,
       uniforms: this.uniforms,
     });
+
+    program.setBlendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
     // let program = new Program(this.gl, {
     //   ...this.programOptions,
     //   transparent: true,
