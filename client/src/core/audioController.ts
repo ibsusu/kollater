@@ -156,6 +156,7 @@ export class AudioController {
     
     this.sourceNode.onended = (_ev) => {
       this.isPlaying = false;
+      window.dispatchEvent(new Event('audioPaused'));
     }
 
     this.analyseAudio();
