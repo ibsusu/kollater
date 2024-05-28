@@ -63,7 +63,7 @@ if(typeof window === 'undefined') {
       // If the registration is active, but it's not controlling the page
       if(registration.active && !navigator.serviceWorker.controller) {
         console.log("Reloading page to make use of COOP/COEP Service Worker.");
-        window.location.reload();
+        // window.location.reload();
       }
     }
   })();
