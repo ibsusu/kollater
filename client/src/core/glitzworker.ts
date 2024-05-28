@@ -18,7 +18,7 @@ class ProxyManager {
   }
 
   handleEvent(event: any) {
-    console.log("target", this.targets, event);
+    // console.log("target", this.targets, event);
     this.targets[event.id].handleEvent(event.data);
   }
 }
@@ -57,7 +57,6 @@ const handlers = {
 };
 
 self.onmessage = function(e) {
-  console.log("onmessage", e);
   //@ts-ignore
   const fn = handlers[e.data.type];
 

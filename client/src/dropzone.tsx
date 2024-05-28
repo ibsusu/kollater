@@ -41,7 +41,7 @@ export const DropzoneComponent = () => {
     return (
       <>
         <div ref={dropzoneRef} className="dropzone bg-gray-500 hover:bg-purple-200 opacity-70 hover:opacity-80 text-grey-200 bg-red cursor-not-allowed" >
-            <div class="dz-message" data-dz-message><span>File uploading disabled</span></div>
+            <div class="dz-message" data-dz-message><span>File uploading is currently disabled.</span></div>
         </div>
       </>
     );
