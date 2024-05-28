@@ -9,7 +9,6 @@ init();
 
 export function App() {
   const initialized = useCore();
-  console.log("app", {initialized});
   
   const handleAnalyzeClick = async () => {
     try {

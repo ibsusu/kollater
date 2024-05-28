@@ -24,7 +24,9 @@ export const slogans = {
 
 export const slogan = () => `${slogans.collect[Math.floor(Math.random() * (slogans.collect.length-1))]}, ${slogans.organize[Math.floor(Math.random() * (slogans.organize.length-1))]}, ${slogans.communicate[Math.floor(Math.random() * (slogans.communicate.length-1))]}`;
 
-
+export function getMinumTextureSize(arraySize: number){
+  return Math.pow(2, Math.ceil(Math.log(Math.ceil(Math.sqrt(arraySize))) / Math.LN2));
+}
 async function destroyDB() {
   clearDirectory(await navigator.storage.getDirectory());
 }

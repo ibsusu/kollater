@@ -1,110 +1,245 @@
-import * as THREE from 'three';
-import {GlitzState, updateSoundAndTouchHistory} from './glitzHistory';
-import { HistoryTexture } from './HistoryTexture';
+import { Entity } from './glitzEntity';
+import { Renderer, Transform, Camera, Vec2, Texture } from 'ogl';
+// type TypedArray = Uint8Array | Float32Array | Int32Array | Uint16Array | Float64Array;
+
+interface SceneParams {
+	canvas: HTMLCanvasElement|OffscreenCanvas,
+	width: number,
+	height: number,
+	pixelRatio: number
+	// data: Record<string, TypedArray|SharedArrayBuffer>
+};
+
+type SharedData = {
+  mutex: SharedArrayBuffer;
+  volume: SharedArrayBuffer;
+  sound?: SharedArrayBuffer;
+};
+
 class Scene {
-  private camera!: THREE.PerspectiveCamera;
-  private scene!: THREE.Scene;
-  private renderer!: THREE.WebGLRenderer;
-  private group!: THREE.Group;
-  private seed: number;
-	private state!: GlitzState;
+  private camera: Camera
+  private scene!: Transform;
+  renderer!: Renderer;
+	devicePixelRatio: number;
+  canvas: any;
+	autoRender = true;
+	canHandleFloat: boolean = true;
+	soundSampleCount: number = 128;
+  private entities: Entity[] = [];
+	private uniforms: any;
+  private volumeArray!: Uint8Array;
+  private soundArray!: Float32Array;
+	// private time: number = Date.now();
+  mutex!: Int32Array;
+	sharedData!: SharedData;
+	// mouse: Vec2;
+	sum!: number;
+	maxDif!: number;
+	maxSample!: number;
+	touchColumns: number = 32;
+  frameLagCount: number = 0;
+  frameCount: number = 0;
+	volumeTexture!: Texture;
+  soundTexture!: Texture;
+  constructor({canvas, width, height, pixelRatio}: SceneParams) {
+    this.canvas = canvas;
+		this.devicePixelRatio = pixelRatio;
+		const c = canvas as HTMLCanvasElement;
 
+		// this.renderer = new Renderer({canvas: c, width: width*1.5, height: height, antialias: true});
+		this.renderer = new Renderer({canvas: c, width, height});
 
-  constructor() {
-    this.seed = Math.floor(Math.random()*100);
+  //  this.renderer.gl.clearColor(.5,.5,.5,0);
+    this.renderer.gl.clearColor(0, 0, 0, 0);
+
+		// this.camera = new Camera(this.renderer.gl, {
+		// 	fov: 70,
+		// 	aspect: 6,
+		// 	near: 0.1,
+		// 	far: 3000,
+		// });
+    this.camera = new Camera(this.renderer.gl, { fov: 15 });
+    this.camera.position.z = 15;
+    this.camera.position.x = -3;
+		this.scene = new Transform();
+		// this.camera.position.z = 1000;
+		// this.camera.setParent(this.scene);
+    this.camera.perspective({aspect: this.canvas.width/ this.canvas.height});
+    this.sharedData = {
+      mutex: new SharedArrayBuffer(4),
+			volume: new SharedArrayBuffer(4)
+    };
   }
 
-  public init(canvas: HTMLCanvasElement, width: number, height: number, pixelRatio: number, path: string) {
-		//@ts-ignore
-		this.state = {}
+  async init() {
+    if(!this.sharedData.sound) throw "Sound must be set as a sharedArrayBuffer before scene can be initialized";
+		this.soundSampleCount = Math.min(this.soundSampleCount, this.renderer.gl.getParameter(this.renderer.gl.MAX_TEXTURE_SIZE));
+		const vertexCount = 100000;
+    // let vertexIds = new Float32Array(vertexCount);
+    // for(let i=0;i<vertexIds.length;++i){
+    //   vertexIds[i] = i;
+    // }
+    this.mutex = new Int32Array(this.sharedData.mutex);
+    // const numParticles = 65536;
+    let gl = this.renderer.gl;
+    // let textureSize = getMinumTextureSize(this.sharedData.sound.byteLength);
+    // this.maxSample = 0.040230318903923035;
+    // this.maxDif = 0.20605286955833435;
+    // this.sum = 0.08247681108270914;
 
-		this.renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas });
-		this.renderer.setPixelRatio(pixelRatio);
-		this.renderer.setSize(width, height, false);
-		
-		let context = this.renderer.getContext();
+    this.volumeArray = new Uint8Array(this.sharedData.volume);
+    this.soundArray = new Float32Array(this.sharedData.sound);
+    
+    // let volumeArray = new Uint8Array([26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222]);
+    // let volumeArray = new Uint8Array([0,0,0,0]);
+    let soundArray = new Float32Array(this.sharedData.sound.byteLength*100).fill(-200);
+    this.soundArray.fill(Math.random() * -400);
+    // console.log('sharedData sound length', this.sharedData.sound.byteLength, soundArray.length, this.soundArray.length);
+    
 
-		this.state.numSoundSamples = Math.min(context.MAX_TEXTURE_SIZE, 1024);
-    this.state.numHistorySamples =  60 * 4; // 4 seconds;
-
-    this.camera = new THREE.PerspectiveCamera(40, width / height, 1, 1000);
-    this.camera.position.z = 200;
-
-    this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x444466, 100, 400);
-    this.scene.background = new THREE.Color(0x444466);
-
-    this.group = new THREE.Group();
-    this.scene.add(this.group);
-
-    const loader = new THREE.ImageBitmapLoader().setPath(path);
-    loader.setOptions({ imageOrientation: 'flipY' });
-    loader.load('../assets/matcap-porcelain-white.jpg', (imageBitmap) => {
-      const texture = new THREE.CanvasTexture(imageBitmap);
-
-      const geometry = new THREE.IcosahedronGeometry(5, 8);
-      const materials = [
-        new THREE.MeshMatcapMaterial({ color: 0xaa24df, matcap: texture }),
-        new THREE.MeshMatcapMaterial({ color: 0x605d90, matcap: texture }),
-        new THREE.MeshMatcapMaterial({ color: 0xe04a3f, matcap: texture }),
-        new THREE.MeshMatcapMaterial({ color: 0xe30456, matcap: texture })
-      ];
-
-      for (let i = 0; i < 100; i++) {
-        const material = materials[i % materials.length];
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.x = this.random() * 200 - 100;
-        mesh.position.y = this.random() * 200 - 100;
-        mesh.position.z = this.random() * 200 - 100;
-        mesh.scale.setScalar(this.random() + 1);
-        this.group.add(mesh);
-      }
-
-			this.state.volumeHistory = new HistoryTexture(this.renderer, {
-				width: 4,
-				length: this.state.numHistorySamples,
-				format: THREE.AlphaFormat
-			});
-			this.state.soundHistory = new HistoryTexture(this.renderer, {
-        width: this.state.numSoundSamples,
-        length: this.state.numHistorySamples,
-        format: THREE.AlphaFormat,
-      });
-			// if (this.state.canUseFloat && this.statecanRenderToFloat) {
-      //   var floatFilter = this.state.canFilterFloat ? THREE.LinearFilter : THREE.NearestFilter;
-      //   this.state.floatSoundHistory = new HistoryTexture(this.renderer, {
-      //     width: this.state.numSoundSamples,
-      //     length: this.state.numHistorySamples,
-      //     min: floatFilter,
-      //     mag: floatFilter,
-      //     format: gl.ALPHA,
-      //     type: gl.FLOAT,
-      //   });
-      // }
-
-      this.animate();
+    
+    let volume = new Texture(this.renderer.gl, {
+      // image: volumeArray,
+      image: this.volumeArray,
+      // image: new Uint8Array(this.volumeArray.length).fill(0),
+      width: 1,
+      type: gl.UNSIGNED_BYTE,
+      format: gl.RGBA,
+      internalFormat: gl.RGBA,
+      wrapS: gl.CLAMP_TO_EDGE,
+      wrapT: gl.CLAMP_TO_EDGE,
+      generateMipmaps: false,
+      minFilter: gl.NEAREST,
+      magFilter: gl.NEAREST,
+      flipY: false,
     });
+    this.volumeTexture = volume;
+    // console.log("soundbyteLength:", (this.sharedData.sound.byteLength));
+    // let arr = new Float32Array(4096*4).fill(-891.048828125)
+    let sound = new Texture(this.renderer.gl, {
+      image: this.soundArray,
+      // image: soundArray,
+      // image: new Float32Array(this.soundArray.byteLength).fill(-891.048828125),
+      width: 16,
+      // height: 64,
+      type: gl.FLOAT,
+      format: gl.RGBA,
+      //@ts-ignore 2339
+      internalFormat: gl.renderer.isWebgl2 ? gl.RGBA32F : gl.RGBA,
+      wrapS: gl.CLAMP_TO_EDGE,
+      wrapT: gl.CLAMP_TO_EDGE,
+      generateMipmaps: false,
+      minFilter: gl.LINEAR,
+      magFilter: gl.LINEAR,
+      flipY: false,
+    });
+    this.soundTexture = sound;
 
-		return this.renderer;
+		this.uniforms = {
+			mouse: {value: new Vec2(0.2,0.5)},
+			resolution: {value: new Vec2(this.canvas.width, this.canvas.height)},
+			// background: {value: new Vec4(200,200,200,200)},
+			time: {value: 0},
+			vertexCount: {value: vertexCount},
+			volume: {value: this.volumeTexture},
+			sound: {value: this.soundTexture},
+      _dontUseDirectly_pointSize: {value: 1},
+		};
+
+		let particlesEntity = new Entity({
+			gl: this.renderer.gl, 
+			scene: this.scene,
+			uniforms: this.uniforms,
+			count: vertexCount,
+			points: true,
+		 });
+
+		 particlesEntity.init();
+		 particlesEntity.setParent();
+		 this.entities.push(particlesEntity);
+
+		this.render();
   }
 
-  private animate = (): void => {
-    this.group.rotation.y = -Date.now() / 4000;
-		updateSoundAndTouchHistory(this.state);
-		var volumeHistoryTex = this.state.volumeHistory.getTexture();
-		var touchHistoryTex = this.state.touchHistory.getTexture();
-		var historyTex = this.state.soundHistory.getTexture();
+  private render = (time: number=0): void => {
 
-    this.renderer.render(this.scene, this.camera);
-    if (self.requestAnimationFrame) {
-      self.requestAnimationFrame(this.animate);
+    if(this.autoRender){
+      requestAnimationFrame(this.render.bind(this));
+		}
+    const gl = this.renderer.gl;
+    const mutexMask = Atomics.load(this.mutex, 0);
+    // console.log({mutexMask});
+    if(mutexMask === 3){
+      
+      let lag = this.frameCount - this.frameLagCount;
+      this.frameLagCount = this.frameCount;
+      // console.log({volumeArray: this.volumeArray, })
+      //@ts-ignore
+      // for (let i = 0; i < this.volumeTexture.image.length; i++) {
+        //@ts-ignore
+        // this.volumeTexture.image[i] = this.volumeArray[i % this.volumeArray.length];
+      // }
+      // this.volumeTexture.image = this.
+      // console.log("update is needed", this.volumeTexture.needsUpdate);
+      // (this.volumeTexture.image! as Uint8Array).fill(this.volumeArray.slice(0,4));
+      this.volumeTexture.needsUpdate = true;
+      // console.log("update is needed", this.soundTexture.image);
+      
+      // let t = this.volumeTexture;
+      // gl.texImage2D(t.target,t.level, t.internalFormat, t.format, t.type, this.volumeTexture); 
+      // (this.soundTexture.image! as Float32Array).set(this.soundArray);
+
+      this.soundTexture.needsUpdate = true;
+      // console.log(`rendering, lag: ${lag}, sound buffer:`, this.soundTexture.image as Float32Array);
+      Atomics.store(this.mutex, 0, 0);
     }
-  };
+    this.frameCount++;
 
-  private random(): number {
-    const x = Math.sin(this.seed++) * 10000;
-    return x - Math.floor(x);
-  }
+    this.uniforms.time.value = time*0.001;
+
+    gl.lineWidth(1);
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.clearColor.apply(gl,[0, 0, 0, 1] );
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // this.entities[0].mesh.program.uniforms.uTime.value = this.time *0.001;
+		this.renderer.render({scene: this.scene, camera: this.camera});
+		// this.updateSoundAndTouchHistory();
+  };
+  
+	// updateSoundAndTouchHistory(){
+	// 	// calculate max 
+	// 	{
+	// 		const buf = this.soundHistory.sharedArray;
+	// 		const len = buf.length;
+	// 		var max = 0;
+	// 		for (let ii = 0; ii < len; ++ii) {
+	// 			const v = buf[ii];
+	// 			if (v > max) {
+	// 				max = v;
+	// 			}
+	// 		}
+	// 		this.volumeHistory.sharedArray[3] = max;
+	// 	}
+	// 	this.volumeHistory.sharedArray[0] = Math.abs(this.maxSample) * 255;
+	// 	this.volumeHistory.sharedArray[1] = this.sum * 255;
+	// 	this.volumeHistory.sharedArray[2] = this.maxDif * 127;
+
+	// 	this.volumeHistory.update();
+	// 	this.soundHistory.update();
+	// 	if (this.floatSoundHistory) {
+	// 		this.floatSoundHistory.update();
+	// 	}
+	// 	// this.touchHistory.update();
+	// }
+}
+
+function getMinumTextureSize(arraySize: number){ // this doesn't actually work, keeping around for future tweaking
+  const size =  Math.pow(2, Math.ceil(Math.log(Math.ceil(Math.sqrt(arraySize))) / Math.LN2));
+  // console.log("mintex size", size/2/2/2);
+  return size
 }
 
 export default Scene;

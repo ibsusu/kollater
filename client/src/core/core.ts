@@ -8,7 +8,8 @@ import CoreWebWorker from './worker?worker';
 import {comms} from './comms';
 import { filer } from "./fileStore";
 import { useEffect, useState } from "preact/hooks";
-import { startMainPage, startWorker } from "./glitzUIThread";
+
+import { startMainPage, startWorker } from "./glitzMainThread";
 import { asyncGeneratorTransferHandler } from "./comlink-async-generator-handler";
 import { audioController } from "./audioController";
 
@@ -95,7 +96,6 @@ class WorkManager {
   }
   async init() {
     let props = await this.workers[0].getProps();
-    console.log({props});
     //@ts-ignore
     props.filter(prop => typeof this.workers[0][prop] === 'function' && prop !== 'constructor' && prop !== 'init' && prop !== 'getProp')
       .forEach(method => {
@@ -129,12 +129,11 @@ export async function init() {
   initGlitz(channel.port1);
   await audioController.init(undefined, channel.port2);
   
-  
   await initWorkers();
-  console.log({workManager});
+  // console.log({workManager});
   await (workManager as unknown as WorkManager).init();
   
-  console.log("workmanager properties", Object.getOwnPropertyNames(workManager));
+  // console.log("workmanager properties", Object.getOwnPropertyNames(workManager));
   // await workManager.hashToString(new Uint8Array([0]));
   await filer.init((workManager as CoreWorker));
   comms.test();
@@ -148,7 +147,6 @@ export function useCore() {
 
   useEffect(() => {
     const handleInitialized = () => {
-      console.log("handling initialized");
       setInitialized(true);
     };
 
@@ -159,6 +157,5 @@ export function useCore() {
     }
   }, []);
 
-  console.log({initialized});
   return initialized;
 }
