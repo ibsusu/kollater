@@ -1,6 +1,0 @@
-[submodule "server/signaling/node-datachannel"]
-	path = server/signaling/node-datachannel
-	url = git@github.com-ibsusu:ibsusu/node-datachannel.git
-[submodule "server/worker/node-datachannel"]
-	path = server/worker/node-datachannel
-	url = git@github.com-ibsusu:ibsusu/node-datachannel.git
