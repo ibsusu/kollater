@@ -20,10 +20,11 @@ export const DropzoneComponent = () => {
             autoProcessQueue: false,
             //acceptedFiles: 'image/*',
             addRemoveLinks: true,
+
             init: function() {
                 this.on("addedfile", file => {
                     console.log("Added file:", file);
-                    filer.importFile(file);
+                    // filer.importFile(file);
                 });
                 this.on("removedfile", file => {
                     console.log("Removed file:", file);
@@ -39,7 +40,9 @@ export const DropzoneComponent = () => {
 
     return (
       <>
-        <div ref={dropzoneRef} className="dropzone" />
+        <div ref={dropzoneRef} className="dropzone bg-gray-500 hover:bg-purple-200 opacity-70 hover:opacity-80 text-grey-200 bg-red cursor-not-allowed" >
+            <div class="dz-message" data-dz-message><span>File uploading disabled</span></div>
+        </div>
       </>
     );
 };

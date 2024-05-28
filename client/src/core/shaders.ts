@@ -229,8 +229,8 @@ varying vec4 v_color;
 #define STEP 1.0
 
 float radius = 0.05;
-float amount = 1000.;
-float len = vertexCount/15. / amount;
+float amount = 800.;
+float len = vertexCount/90. / amount;
 
 float mod289(float x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
 vec4 mod289(vec4 x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
@@ -262,22 +262,81 @@ void main() {gl_PointSize=1.0;
   float ratio = resolution.x / resolution.y;
   float seg = floor(vertexId/len/200.);
   float segId = mod(vertexId,len*100.);
+  float mod3 = mod(segId, 3.0);
+  float step0 = step(mod3, 0.5); // 1.0 if segId % 3 == 0, 0.0 otherwise
+  float step1 = step(0.5, mod3) * step(mod3, 1.5); // 1.0 if segId % 3 == 1, 0.0 otherwise
+  float step2 = step(1.5, mod3); // 1.0 if segId % 3 == 2, 0.0 otherwise
+
   float v = texture2D(volume, vec2(1., (1.+seg)/amount*240.)).a;
-  float s = texture2D(sound, vec2(1., (1.+segId)/len*240.)).a;
+  float s = texture2D(sound, vec2(1., (1.+segId)/len*140.)).a;
   vec3 p = vec3(vertexId * 0.005, seg, time*0.05 - segId*0.0001);
   float n = noise(p);
-  float x = cos(vertexId/vertexCount * PI * 2.)*(v*radius*3.+segId*0.002);
-  float y = sin(vertexId/vertexCount * PI * 2.)*ratio*(v*radius*3.+segId*0.00189);
-  float z = segId * 0.006;
-
-  x += cos(n * PI*4.) * segId * 0.000002 * s*2.;
-  y += sin(n * PI*4.) * segId * 0.0000015 * s*2. * ratio;
+  float x = (0. + cos(n * PI) * sin(segId * 0.00001) * s) * step2; // Applies when segId % 3 == 2, the smile
+  float y = (.0 + sin(n * PI) * segId * 0.0000015 * s * ratio)*1./  cos(segId)*step2;
   
-  gl_Position = vec4(x, y,0, 1);
+  
+  x += cos(vertexId/vertexCount * PI * 2.)*(v*radius*2.+segId*0.002)*(step0+step1);
+  y += sin(vertexId/vertexCount * PI * 2.)*ratio*(v*radius*2.+segId*0.00189)*(step0+step1);
+  // float z = segId * 0.006;
+  // float z = sin(segId * 0.006) * 0.5;
+  float z = 0.7*step2-abs(cos(segId-.1)/0.9) *step2;
+  z += 1./exp(-segId * 0.002) * 0.5*(step0+step1);
 
+  // Calculate smileAngle for each vertex based on vertexId
+  // float smileAngle = mix(-PI / 4.0, -3.0 * PI / 4.0, vertexId / vertexCount);
+
+  // // Calculate the x and y position of the arc
+  // float x = radius * cos(smileAngle);
+  // float y = radius * sin(smileAngle) - 0.5; // Adjust the vertical position for a smile
+
+  // Set the position of the point
+  vec4 position = vec4(x, y, 0.0, 1.0);
+  gl_Position = position;
+
+  
+  x += (.4 + cos(n * PI * 4.0) * segId * 0.000002 * s) * step0; // Applies when segId % 3 == 0
+  x += (-.4 + sin(n * PI * 3.0) * segId * 0.000003 * s) * step1; // Applies when segId % 3 == 1
+  y += (.3 + sin(n * PI*4.) * segId * 0.0000015 * s * ratio)*step0;
+  y += (.3 + sin(n * PI*4.) * segId * 0.0000015 * s * ratio)*step1;
+
+  z += cos(n * PI * 4.0) * segId * 0.000002 * s*(step0+step1);
+  
+  
+  float angle = PI * mouse.x; // Rotates 180 degrees based on mouse.x from -1 to 1
+  
+  // Calculate rotation angles based on mouse positions
+  float angleX = radians(-90.0) * mouse.y*.3; // Rotation around X-axis based on mouse y
+  float angleY = radians(90.0) * mouse.x; // Rotation around Y-axis based on mouse x
+  float angleZ = radians(0.0) * mouse.x; // Rotation around Z-axis based on mouse x
+
+  // Rotation matrices operations
+  // Rotate around X
+  float newY = y * cos(angleX) - z * sin(angleX);
+  float newZ = y * sin(angleX) + z * cos(angleX);
+  y = newY;
+  z = newZ;
+
+  // Rotate around Y
+  float newX = x * cos(angleY) + z * sin(angleY);
+  newZ = z * cos(angleY) - x * sin(angleY);
+  x = newX;
+  z = newZ;
+
+  // Rotate around Z
+  newX = x * cos(angleZ) - y * sin(angleZ);
+  newY = x * sin(angleZ) + y * cos(angleZ);
+  x = newX;
+  y = newY;
+
+  // x += cos(n * PI*4.) * segId * 0.000002 * s*2.;
+  // y += sin(n * PI*4.) * segId * 0.0000015 * s*2. * ratio;
+  
   float b = 0.3 / mod(vertexId/len,1.);
-  v_color = vec4(vec3(b), 0.5);
-;
+  v_color = vec4(vec3(b), 1.0);
+
+  // Set the new position
+  gl_Position = vec4(x, y, z, 1.0);
+ ;
 gl_PointSize = max(0., gl_PointSize*_dontUseDirectly_pointSize);
 }
 `;

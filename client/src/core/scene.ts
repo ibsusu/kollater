@@ -7,7 +7,7 @@ interface SceneParams {
 	width: number,
 	height: number,
 	pixelRatio: number
-	// data: Record<string, TypedArray|SharedArrayBuffer>
+  pointer: { baseX: number, x: number, baseY: number, y: number };
 };
 
 type SharedData = {
@@ -32,7 +32,6 @@ class Scene {
 	// private time: number = Date.now();
   mutex!: Int32Array;
 	sharedData!: SharedData;
-	// mouse: Vec2;
 	sum!: number;
 	maxDif!: number;
 	maxSample!: number;
@@ -41,9 +40,11 @@ class Scene {
   frameCount: number = 0;
 	volumeTexture!: Texture;
   soundTexture!: Texture;
-  constructor({canvas, width, height, pixelRatio}: SceneParams) {
+  pointer: { baseX: number; x: number; baseY: number; y: number; };
+  constructor({canvas, width, height, pixelRatio, pointer}: SceneParams) {
     this.canvas = canvas;
 		this.devicePixelRatio = pixelRatio;
+    this.pointer = pointer;
 		const c = canvas as HTMLCanvasElement;
 
 		// this.renderer = new Renderer({canvas: c, width: width*1.5, height: height, antialias: true});
@@ -186,6 +187,8 @@ class Scene {
     this.frameCount++;
 
     this.uniforms.time.value = time*0.001;
+    this.uniforms.mouse.value.x = this.pointer.x;
+    this.uniforms.mouse.value.y = this.pointer.y;
 
     gl.lineWidth(1);
     gl.enable(gl.DEPTH_TEST);

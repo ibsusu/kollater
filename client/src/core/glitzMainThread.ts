@@ -110,7 +110,7 @@ class ElementProxy {
 
     for (const [eventName, handler] of Object.entries(eventHandlers)) {
       // console.log("addeventListener", element, eventName);
-      if(eventName === 'pointerUp') 
+      // if(eventName === 'pointerUp')
       element.addEventListener(eventName, function(event: any) {
         //@ts-ignore
         handler(event, sendEvent);
@@ -157,7 +157,7 @@ export function startWorker(canvas: HTMLCanvasElement, messagePort: MessagePort)
   const eventHandlers = {
     // contextmenu: preventDefaultHandler,
     // mousedown: mouseEventHandler,
-    // mousemove: mouseEventHandler,
+    mousemove: mouseEventHandler,
     // mouseup: mouseEventHandler,
     pointerdown: mouseEventHandler,
     pointermove: mouseEventHandler,
@@ -168,7 +168,7 @@ export function startWorker(canvas: HTMLCanvasElement, messagePort: MessagePort)
     wheel: wheelEventHandler,
     keydown: filteredKeydownEventHandler,
   };
-
+  console.log("startworker");
   const proxy = new ElementProxy(window, worker, eventHandlers);
   // const proxy = new ElementProxy(canvas, worker, eventHandlers);
   const msg = {

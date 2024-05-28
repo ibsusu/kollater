@@ -24,7 +24,7 @@ export class GlitzController {
     const height = data.innerHeight;
     const pixelRatio = data.devicePixelRatio;
 
-    this.scene = new Scene({canvas: data.canvas, width, height, pixelRatio});
+    this.scene = new Scene({canvas: data.canvas, width, height, pixelRatio, pointer: this.mouse});
     console.log('init scene called', pixelRatio);
     this.renderer = this.scene.renderer;
     this.gl = this.scene.renderer.gl;

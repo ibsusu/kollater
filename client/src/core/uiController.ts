@@ -74,6 +74,7 @@ export class UIController {
   }
 
   startRender(){
+    console.log('all glitzern', this.glitzern);
     for(let glitz of this.glitzern){
       //console.log("startRender glitz", glitz);
       if(!glitz.autoRender.value){
