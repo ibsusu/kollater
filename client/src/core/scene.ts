@@ -75,24 +75,14 @@ class Scene {
     if(!this.sharedData.sound) throw "Sound must be set as a sharedArrayBuffer before scene can be initialized";
 		this.soundSampleCount = Math.min(this.soundSampleCount, this.renderer.gl.getParameter(this.renderer.gl.MAX_TEXTURE_SIZE));
 		const vertexCount = 100000;
-    // let vertexIds = new Float32Array(vertexCount);
-    // for(let i=0;i<vertexIds.length;++i){
-    //   vertexIds[i] = i;
-    // }
     this.mutex = new Int32Array(this.sharedData.mutex);
     // const numParticles = 65536;
     let gl = this.renderer.gl;
-    // let textureSize = getMinumTextureSize(this.sharedData.sound.byteLength);
-    // this.maxSample = 0.040230318903923035;
-    // this.maxDif = 0.20605286955833435;
-    // this.sum = 0.08247681108270914;
+
 
     this.volumeArray = new Uint8Array(this.sharedData.volume);
     this.soundArray = new Float32Array(this.sharedData.sound);
     
-    // let volumeArray = new Uint8Array([26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222]);
-    // let volumeArray = new Uint8Array([0,0,0,0]);
-    let soundArray = new Float32Array(this.sharedData.sound.byteLength*100).fill(-200);
     this.soundArray.fill(Math.random() * -400);
     // console.log('sharedData sound length', this.sharedData.sound.byteLength, soundArray.length, this.soundArray.length);
     
@@ -171,8 +161,8 @@ class Scene {
     // console.log({mutexMask});
     if(mutexMask === 3){
       
-      let lag = this.frameCount - this.frameLagCount;
-      this.frameLagCount = this.frameCount;
+      // let lag = this.frameCount - this.frameLagCount;
+      // this.frameLagCount = this.frameCount;
       // console.log({volumeArray: this.volumeArray, })
       //@ts-ignore
       // for (let i = 0; i < this.volumeTexture.image.length; i++) {
@@ -208,38 +198,7 @@ class Scene {
 		this.renderer.render({scene: this.scene, camera: this.camera});
 		// this.updateSoundAndTouchHistory();
   };
-  
-	// updateSoundAndTouchHistory(){
-	// 	// calculate max 
-	// 	{
-	// 		const buf = this.soundHistory.sharedArray;
-	// 		const len = buf.length;
-	// 		var max = 0;
-	// 		for (let ii = 0; ii < len; ++ii) {
-	// 			const v = buf[ii];
-	// 			if (v > max) {
-	// 				max = v;
-	// 			}
-	// 		}
-	// 		this.volumeHistory.sharedArray[3] = max;
-	// 	}
-	// 	this.volumeHistory.sharedArray[0] = Math.abs(this.maxSample) * 255;
-	// 	this.volumeHistory.sharedArray[1] = this.sum * 255;
-	// 	this.volumeHistory.sharedArray[2] = this.maxDif * 127;
-
-	// 	this.volumeHistory.update();
-	// 	this.soundHistory.update();
-	// 	if (this.floatSoundHistory) {
-	// 		this.floatSoundHistory.update();
-	// 	}
-	// 	// this.touchHistory.update();
-	// }
 }
 
-function getMinumTextureSize(arraySize: number){ // this doesn't actually work, keeping around for future tweaking
-  const size =  Math.pow(2, Math.ceil(Math.log(Math.ceil(Math.sqrt(arraySize))) / Math.LN2));
-  // console.log("mintex size", size/2/2/2);
-  return size
-}
 
 export default Scene;

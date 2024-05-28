@@ -57,7 +57,7 @@ export class UIController {
     }
   }
 
-  wheelHandler(event:any){
+  wheelHandler(_event:any){
     console.log("wheelHandler");
   }
 

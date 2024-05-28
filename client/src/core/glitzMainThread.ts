@@ -1,10 +1,6 @@
 import {glitzController} from './glitzController.ts';
 import {UIController} from './uiController.ts';
-// import {type GlitzWorker} from './glitzWorker';
-// export {type GlitzWorker} from './glitzWorker';
 import GlitzWorker from './glitzWorker?worker';
-import { audioController } from './audioController.ts';
-
 
 const mouseEventHandler = makeSendPropertiesHandler([
   'ctrlKey',
@@ -35,6 +31,7 @@ function wheelEventHandler(event: any, sendFn: any) {
   wheelEventHandlerImpl(event, sendFn);
 }
 
+//@ts-ignore
 function preventDefaultHandler(event: any) {
   event.preventDefault();
 }
@@ -54,6 +51,7 @@ function makeSendPropertiesHandler(properties: any) {
   };
 }
 
+//@ts-ignore
 function touchEventHandler(event: any, sendFn: any) {
   const touches: any[] = [];
   const data = {type: event.type, touches};
@@ -68,6 +66,7 @@ function touchEventHandler(event: any, sendFn: any) {
 }
 
 // The four arrow keys
+//@ts-ignore
 const orbitKeys = {
   '37': true,  // left
   '38': true,  // up
@@ -76,7 +75,7 @@ const orbitKeys = {
 };
 function filteredKeydownEventHandler(event: any, sendFn: any) {
   // console.log("filtered keydowneventhandler", event, sendFn);
-  const {keyCode} = event;
+  // const {keyCode} = event;
   keydownEventHandler(event, sendFn);
 
   // if (orbitKeys[keyCode]) {
@@ -234,15 +233,15 @@ export async function startMainPage(canvas: HTMLCanvasElement, messagePort: Mess
     window.addEventListener(eventName, handler.bind(controller));
   }
 
-  window.addEventListener('resize', (event) => {
+  window.addEventListener('resize', (_event) => {
     const rect = {top: 0, left: 0, width: window.innerWidth, height: window.innerHeight}
     controller.sizeHandler(rect);
   });
-  window.addEventListener('fullscreenchange', (event) => {
+  window.addEventListener('fullscreenchange', (_event) => {
     const rect = {top: 0, left: 0, width: window.innerWidth, height: window.innerHeight}
     controller.sizeHandler(rect);
   });
-  window.addEventListener('webkitfullscreenchange', (event) => {
+  window.addEventListener('webkitfullscreenchange', (_event) => {
     const rect = {top: 0, left: 0, width: window.innerWidth, height: window.innerHeight}
     controller.sizeHandler(rect);
   });

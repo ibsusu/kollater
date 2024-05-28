@@ -1,5 +1,5 @@
 import {AttributeMap, Geometry, Mesh, OGLRenderingContext, Program, ProgramOptions, Transform, Vec3} from 'ogl';
-import { getVertexEyesShader, fragmentShader, eyesVShader, particleFragmentShader, particleVertexShader } from './shaders';
+import { fragmentShader, eyesVShader } from './shaders';
 export interface EntityParams {
   gl: OGLRenderingContext,
   scene: Transform,

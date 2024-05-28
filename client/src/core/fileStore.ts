@@ -146,6 +146,7 @@ export class Filer {
       // we hash the encrypted file chunk
       let chunkHash = await crypto.subtle.digest('SHA-256', chunk);
       // let hash = new Uint8Array(await crypto.subtle.digest('SHA-256',b64ToBytes(merkleHashStrings[chunkIndex])));
+      //@ts-ignore
       let uploadResponse = await comms.upload(new Uint8Array(chunkHash), chunk.length, chunk); // TODO NOT DONE YET
       let ok = uploadResponse[0];
       if(!ok) console.error(`upload of file ${file.name} failed, chunk index: ${chunkIndex}`);

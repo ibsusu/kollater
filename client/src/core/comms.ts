@@ -3,7 +3,7 @@ import global from 'global';
 import * as process from "process";
 global.process = process;
 import Peer, {Instance as SimplePeerInstance} from 'simple-peer';
-import { sleep, bmsg as b, bytesToString, numberToBytes } from './utils';
+import { sleep, bmsg as b, bytesToString } from './utils';
 import { RTC_MESSAGE_REASON as REASON } from './constants';
 import {stringify as uuidStringify, parse as uuidParse, v4 as uuidv4, validate as uuidValidate} from 'uuid';
 
@@ -314,7 +314,7 @@ class CommsWorker {
   async upload(hash: Uint8Array/*32 bytes*/, data: Uint8Array){
     let peer = this.peers.values().next()?.value;
     if(!peer || peer.destroyed) throw Error("No peers to upload to");
-    let sizeBytes = numberToBytes(data.byteLength); // explicitly setting to 8 bytes.
+    // let sizeBytes = numberToBytes(data.byteLength); // explicitly setting to 8 bytes.
     let uploadingPromise = this.setUploading(peer);
     console.log("peer sending hash:", hash);
     // console.log("binary encoding of upload data:", b(REASON.UPLOAD, hash, sizeBytes, data));

@@ -1,5 +1,4 @@
-import { sleep } from "./utils";
-
+// import { sleep } from "./utils";     
 const workletProcessorUrl = "/js/noiseProcessor.js";
 const defaultMusicUrl = '/audio/a_corp.ogg';
 
@@ -30,7 +29,6 @@ export class AudioController {
   private messagePort?: MessagePort;
   private mutexBuffer!: SharedArrayBuffer;
   private mutex!: Int32Array;
-  private mutexConsumed = false; // mutex count starts at 0
   private byteFreqs: Uint8Array;
   volumeBuffer!: SharedArrayBuffer// shared buffers require secure context. we always run on https
   soundBuffer!: SharedArrayBuffer;
@@ -141,7 +139,7 @@ export class AudioController {
 
     this.startTime = this.audioContext.currentTime - this.pausedAt;
     
-    this.sourceNode.onended = (ev) => {
+    this.sourceNode.onended = (_ev) => {
       this.isPlaying = false;
     }
 
