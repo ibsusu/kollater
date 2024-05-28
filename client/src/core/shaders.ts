@@ -267,13 +267,13 @@ void main() {gl_PointSize=1.0;
   vec3 p = vec3(vertexId * 0.005, seg, time*0.05 - segId*0.0001);
   float n = noise(p);
   float x = cos(vertexId/vertexCount * PI * 2.)*(v*radius*3.+segId*0.002);
-  float y = sin(vertexId/vertexCount * PI * 2.)*ratio*(v*radius*3.+segId*0.00145);
-  float z = segId * 0.005;
+  float y = sin(vertexId/vertexCount * PI * 2.)*ratio*(v*radius*3.+segId*0.00189);
+  float z = segId * 0.006;
 
-  x += cos(n * PI*4.) * segId * 0.000002 * s;
-  y += sin(n * PI*4.) * segId * 0.0000015 * s * ratio;
+  x += cos(n * PI*4.) * segId * 0.000002 * s*2.;
+  y += sin(n * PI*4.) * segId * 0.0000015 * s*2. * ratio;
   
-  gl_Position = vec4(x, y, z, 1);
+  gl_Position = vec4(x, y,0, 1);
 
   float b = 0.3 / mod(vertexId/len,1.);
   v_color = vec4(vec3(b), 0.5);

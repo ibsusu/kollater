@@ -65,7 +65,8 @@ export class GlitzController {
     if(ev.data.reason === 'audioConnected' && !this.connectedAudio){
       this.connectedAudio = true;
       this.scene.canHandleFloat = this.canHandleFloat;
-      this.scene.sharedData.sound = new SharedArrayBuffer(this.maxTextureSize);
+      console.log('bincount and maxtexturesize', {binCount: ev.data.frequencyBinCount, maxtsize: this.maxTextureSize});
+      this.scene.sharedData.sound = new SharedArrayBuffer(Math.min(this.maxTextureSize, ev.data.frequencyBinCount)*4);
       this.scene.init();
       this.sendSharedBuffers();
     }

@@ -8,7 +8,8 @@ import CoreWebWorker from './worker?worker';
 import {comms} from './comms';
 import { filer } from "./fileStore";
 import { useEffect, useState } from "preact/hooks";
-import { startMainPage, startWorker } from "./glitzUIThread";
+
+import { startMainPage, startWorker } from "./glitzMainThread";
 import { asyncGeneratorTransferHandler } from "./comlink-async-generator-handler";
 import { audioController } from "./audioController";
 

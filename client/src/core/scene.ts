@@ -1,11 +1,6 @@
-import { INFINITY } from 'three/examples/jsm/nodes/Nodes.js';
 import { Entity } from './glitzEntity';
-// import { GlitzGroup} from './glitzGroup';
-import { Renderer, Transform, Camera, Vec2, Vec4, Texture } from 'ogl';
-
-// import { getVertexEyesShader } from './shaders';
-
-type TypedArray = Uint8Array | Float32Array | Int32Array | Uint16Array | Float64Array;
+import { Renderer, Transform, Camera, Vec2, Texture } from 'ogl';
+// type TypedArray = Uint8Array | Float32Array | Int32Array | Uint16Array | Float64Array;
 
 interface SceneParams {
 	canvas: HTMLCanvasElement|OffscreenCanvas,
@@ -13,6 +8,12 @@ interface SceneParams {
 	height: number,
 	pixelRatio: number
 	// data: Record<string, TypedArray|SharedArrayBuffer>
+};
+
+type SharedData = {
+  mutex: SharedArrayBuffer;
+  volume: SharedArrayBuffer;
+  sound?: SharedArrayBuffer;
 };
 
 class Scene {
@@ -26,15 +27,20 @@ class Scene {
 	soundSampleCount: number = 128;
   private entities: Entity[] = [];
 	private uniforms: any;
+  private volumeArray!: Uint8Array;
+  private soundArray!: Float32Array;
 	// private time: number = Date.now();
   mutex!: Int32Array;
-	sharedData!: Record<string, SharedArrayBuffer>;
+	sharedData!: SharedData;
 	// mouse: Vec2;
 	sum!: number;
 	maxDif!: number;
 	maxSample!: number;
 	touchColumns: number = 32;
-	
+  frameLagCount: number = 0;
+  frameCount: number = 0;
+	volumeTexture!: Texture;
+  soundTexture!: Texture;
   constructor({canvas, width, height, pixelRatio}: SceneParams) {
     this.canvas = canvas;
 		this.devicePixelRatio = pixelRatio;
@@ -61,11 +67,11 @@ class Scene {
     this.camera.perspective({aspect: this.canvas.width/ this.canvas.height});
     this.sharedData = {
       mutex: new SharedArrayBuffer(4),
-			volume: new SharedArrayBuffer(64)
+			volume: new SharedArrayBuffer(4)
     };
   }
 
-  public async init() {
+  async init() {
     if(!this.sharedData.sound) throw "Sound must be set as a sharedArrayBuffer before scene can be initialized";
 		this.soundSampleCount = Math.min(this.soundSampleCount, this.renderer.gl.getParameter(this.renderer.gl.MAX_TEXTURE_SIZE));
 		const vertexCount = 100000;
@@ -76,35 +82,27 @@ class Scene {
     this.mutex = new Int32Array(this.sharedData.mutex);
     // const numParticles = 65536;
     let gl = this.renderer.gl;
-    let textureSize = getMinumTextureSize(this.sharedData.sound.byteLength);
-    this.maxSample = 0.040230318903923035;
-    this.maxDif = 0.20605286955833435;
-    this.sum = 0.08247681108270914;
+    // let textureSize = getMinumTextureSize(this.sharedData.sound.byteLength);
+    // this.maxSample = 0.040230318903923035;
+    // this.maxDif = 0.20605286955833435;
+    // this.sum = 0.08247681108270914;
+
+    this.volumeArray = new Uint8Array(this.sharedData.volume);
+    this.soundArray = new Float32Array(this.sharedData.sound);
     
-    let volumeArray = new Uint8Array([26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222]);
-    // volumeArray[0] = 26;
-    // {
-    //   const buf = s.soundHistory.buffer;
-    //   const len = buf.length;
-    //   var max = 0;
-    //   for (let ii = 0; ii < len; ++ii) {
-    //     const v = buf[ii];
-    //     if (v > max) {
-    //       max = v;
-    //     }
-    //   }
-    //   s.volumeHistory.buffer[3] = max;
-    // }
-    // s.volumeHistory.buffer[0] = Math.abs(s.maxSample) * 255;
-    // s.volumeHistory.buffer[1] = s.sum * 255;
-    // s.volumeHistory.buffer[2] = s.maxDif * 127;
+    // let volumeArray = new Uint8Array([26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222,26,14,29,222]);
+    // let volumeArray = new Uint8Array([0,0,0,0]);
+    let soundArray = new Float32Array(this.sharedData.sound.byteLength*100).fill(-200);
+    this.soundArray.fill(Math.random() * -400);
+    // console.log('sharedData sound length', this.sharedData.sound.byteLength, soundArray.length, this.soundArray.length);
     
 
     
     let volume = new Texture(this.renderer.gl, {
-      image: volumeArray,
-      // image: new Uint8Array(this.sharedData.volume).fill(0),
-      width: 4,
+      // image: volumeArray,
+      image: this.volumeArray,
+      // image: new Uint8Array(this.volumeArray.length).fill(0),
+      width: 1,
       type: gl.UNSIGNED_BYTE,
       format: gl.RGBA,
       internalFormat: gl.RGBA,
@@ -115,12 +113,14 @@ class Scene {
       magFilter: gl.NEAREST,
       flipY: false,
     });
-    console.log("soundbyteLength:", (this.sharedData.sound.byteLength));
-    let arr = new Float32Array(4096*4).fill(-891.048828125)
+    this.volumeTexture = volume;
+    // console.log("soundbyteLength:", (this.sharedData.sound.byteLength));
+    // let arr = new Float32Array(4096*4).fill(-891.048828125)
     let sound = new Texture(this.renderer.gl, {
-      image: arr,
-      // image: new Float32Array(this.sharedData.sound.byteLength*20).fill(-891.048828125),
-      width: 64,
+      image: this.soundArray,
+      // image: soundArray,
+      // image: new Float32Array(this.soundArray.byteLength).fill(-891.048828125),
+      width: 16,
       // height: 64,
       type: gl.FLOAT,
       format: gl.RGBA,
@@ -133,19 +133,16 @@ class Scene {
       magFilter: gl.LINEAR,
       flipY: false,
     });
+    this.soundTexture = sound;
 
 		this.uniforms = {
 			mouse: {value: new Vec2(0.2,0.5)},
 			resolution: {value: new Vec2(this.canvas.width, this.canvas.height)},
-			background: {value: new Vec4(200,200,200,200)},
+			// background: {value: new Vec4(200,200,200,200)},
 			time: {value: 0},
 			vertexCount: {value: vertexCount},
-      // vertexId: {value: vertexIds},
-			// volume: {value: new Uint8Array(this.sharedData.volume)},
-			// sound: {value: this.canHandleFloat? new Float32Array(this.sharedData.sound.byteLength) : new Uint8Array(this.sharedData.sound.byteLength)},
-			volume: {value: volume},
-			sound: {value: sound},
-      // _dontUseDirectly_pointSize: {value: this.devicePixelRatio},
+			volume: {value: this.volumeTexture},
+			sound: {value: this.soundTexture},
       _dontUseDirectly_pointSize: {value: 1},
 		};
 
@@ -165,16 +162,42 @@ class Scene {
   }
 
   private render = (time: number=0): void => {
-		if(this.autoRender){
-			requestAnimationFrame(this.render.bind(this));
+
+    if(this.autoRender){
+      requestAnimationFrame(this.render.bind(this));
 		}
-    let gl = this.renderer.gl;
-		// let delta = time - this.time;
-		// this.time = time;
+    const gl = this.renderer.gl;
+    const mutexMask = Atomics.load(this.mutex, 0);
+    // console.log({mutexMask});
+    if(mutexMask === 3){
+      
+      let lag = this.frameCount - this.frameLagCount;
+      this.frameLagCount = this.frameCount;
+      // console.log({volumeArray: this.volumeArray, })
+      //@ts-ignore
+      // for (let i = 0; i < this.volumeTexture.image.length; i++) {
+        //@ts-ignore
+        // this.volumeTexture.image[i] = this.volumeArray[i % this.volumeArray.length];
+      // }
+      // this.volumeTexture.image = this.
+      // console.log("update is needed", this.volumeTexture.needsUpdate);
+      // (this.volumeTexture.image! as Uint8Array).fill(this.volumeArray.slice(0,4));
+      this.volumeTexture.needsUpdate = true;
+      // console.log("update is needed", this.soundTexture.image);
+      
+      // let t = this.volumeTexture;
+      // gl.texImage2D(t.target,t.level, t.internalFormat, t.format, t.type, this.volumeTexture); 
+      // (this.soundTexture.image! as Float32Array).set(this.soundArray);
+
+      this.soundTexture.needsUpdate = true;
+      // console.log(`rendering, lag: ${lag}, sound buffer:`, this.soundTexture.image as Float32Array);
+      Atomics.store(this.mutex, 0, 0);
+    }
+    this.frameCount++;
 
     this.uniforms.time.value = time*0.001;
-    gl.lineWidth(1);
 
+    gl.lineWidth(1);
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -213,8 +236,10 @@ class Scene {
 	// }
 }
 
-function getMinumTextureSize(arraySize: number){
-  return Math.pow(2, Math.ceil(Math.log(Math.ceil(Math.sqrt(arraySize))) / Math.LN2));
+function getMinumTextureSize(arraySize: number){ // this doesn't actually work, keeping around for future tweaking
+  const size =  Math.pow(2, Math.ceil(Math.log(Math.ceil(Math.sqrt(arraySize))) / Math.LN2));
+  // console.log("mintex size", size/2/2/2);
+  return size
 }
 
 export default Scene;

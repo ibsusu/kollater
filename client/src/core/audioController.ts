@@ -3,48 +3,53 @@ import { sleep } from "./utils";
 const workletProcessorUrl = "/js/noiseProcessor.js";
 const defaultMusicUrl = '/audio/a_corp.ogg';
 
+
+/**
+ * Notes for future forgetful me ----
+ * HOW THIS THING WORKS:
+ * this class creates a worklet that proceses the audio channels, the max volume is calc'd that way
+ * the frequency analysis happens on the main thread.  It cannot be done on the worker thread, it's part of the standard
+ * there are two mutexes. one is for the workletnode and the other is for whatever is using the audio controller.
+ * it expects the messages to come from the message port that's passed in on initialization.
+ * the workletnode is initialized when the shared buffers are passed to the audio controller
+ * the reason there is basically a ping/pong connection request is because we need to know 
+ * the analyserNode.frequencyBinCount for the size of the shared buffers.  it can vary by machine/browser or just future updates
+ * let's goo
+ * 
+ */
 export class AudioController {
   private audioContext: AudioContext;
   private audioBuffer: AudioBuffer | null = null;
   private sourceNode: AudioBufferSourceNode | null = null;
   private gainNode!: GainNode;
   private analyserNode!: AnalyserNode;
-  private workletNode: AudioWorkletNode | null = null;
+  private workletNode!: AudioWorkletNode;
   private pausedAt: number = 0;
   private startTime!: number;
   isPlaying: boolean = false;
   private messagePort?: MessagePort;
-  private maxSample: any = 0;
-  private maxDif: number = 0;
-  private sum: number = 0;
-  private workletMutexBuffer: SharedArrayBuffer = new SharedArrayBuffer(4);
-  private workletMutex!: Int32Array;
   private mutexBuffer!: SharedArrayBuffer;
   private mutex!: Int32Array;
-  private floatFreqs: Float32Array = new Float32Array(4096*4);
-  private volumeBytes: Uint8Array = new Uint8Array(4);
+  private mutexConsumed = false; // mutex count starts at 0
+  private byteFreqs: Uint8Array;
   volumeBuffer!: SharedArrayBuffer// shared buffers require secure context. we always run on https
   soundBuffer!: SharedArrayBuffer;
-  floatSoundBuffer!: SharedArrayBuffer;
-  floatSoundArray!: Float32Array;
   volumeArray!: Uint8Array;
-  soundArray!: Uint8Array;
-  soundArraySwapper!: Uint8Array;
-  // these two sharedArrayBuffers go to the worklet go to the audio worklet
-  private audioChannelBufferLeft: SharedArrayBuffer;
-  private audioChannelBufferRight: SharedArrayBuffer;
-  
+  soundArray!: Float32Array;
+  soundArraySwapper!: Float32Array;
 
   constructor() {
     this.audioContext = new AudioContext();
-    this.audioChannelBufferLeft = new SharedArrayBuffer(4096);
-    this.audioChannelBufferRight = new SharedArrayBuffer(4096);
-    this.workletMutex = new Int32Array(this.workletMutexBuffer);
     this.analyserNode = this.audioContext.createAnalyser();
+    this.byteFreqs = new Uint8Array(this.analyserNode.frequencyBinCount);
   }
 
   async init(url: string=defaultMusicUrl, messagePort?: MessagePort): Promise<void> {
+    // Load the Audio Worklet module
+    await this.audioContext.audioWorklet.addModule(workletProcessorUrl);
 
+    // Create an AudioWorkletNode
+    this.workletNode = new AudioWorkletNode(this.audioContext, 'noise-processor');
     this.messagePort = messagePort;
     if(this.messagePort){
       this.messagePort.onmessage = this.handleWorkerMessage.bind(this);
@@ -56,7 +61,6 @@ export class AudioController {
     }
     const arrayBuffer = await response.arrayBuffer();
     this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-    this.saveMaxSample(this.audioBuffer);
   }
 
   firstStart() {
@@ -75,12 +79,17 @@ export class AudioController {
       this.volumeBuffer = ev.data.volumeBuffer;
       this.volumeArray = new Uint8Array(this.volumeBuffer)
       this.soundBuffer = ev.data.soundBuffer;
-      this.soundArray = new Uint8Array(this.soundBuffer);
-      if(ev.data.floatSoundBuffer){
-        this.floatSoundBuffer = ev.data.floatSoundBuffer;
-        this.floatSoundArray = new Float32Array(this.floatSoundBuffer);
-      }
-      this.soundArraySwapper = new Uint8Array(this.soundArray.byteLength);
+      this.soundArray = new Float32Array(this.soundBuffer);
+
+      // we initialize the workletNode here because we don't have the volume buffer until sharedBuffers are transfered.
+      
+      this.workletNode.port.postMessage({
+        reason: 'initialize',
+        mutexBuffer: this.mutexBuffer,
+        volumeBuffer: this.volumeBuffer
+      });
+     
+      this.soundArraySwapper = new Float32Array(this.soundArray.length);
       console.log("sharedbuffer message received", this.messagePort);
     }
   }
@@ -101,16 +110,6 @@ export class AudioController {
       await this.audioContext.resume();
     }
 
-    // Load the Audio Worklet module
-    await this.audioContext.audioWorklet.addModule(workletProcessorUrl);
-
-    // Create an AudioWorkletNode
-    // this.workletNode = new AudioWorkletNode(this.audioContext, 'noise-processor');
-    // this.workletNode.port.postMessage({
-    //   reason: 'initialize',
-    //   // mutexBuffer: this.workletMutexBuffer,
-    // });
-
     if(this.messagePort){
       // this.workletNode.port.postMessage({reason: 'initialize', }, [this.messagePort]);
       this.messagePort.onmessage = this.handleWorkerMessage.bind(this);
@@ -125,15 +124,16 @@ export class AudioController {
     this.analyserNode.fftSize = 2048;  // defaults to 2048 but we're going to explicitly set it.
     const bufferLength = this.analyserNode.frequencyBinCount; // should be half the fftSize, so 1024
     console.log("BUFFERLENGTH", bufferLength);
-    const dataArray = new Uint8Array(bufferLength);
     this.gainNode = this.audioContext.createGain();
-    this.gainNode.gain.value = 0;
+    this.gainNode.gain.value = 1;
     // Connect the nodes
     
+    // this stuff happens in order analyser -> worklet, gain. 
+    // if gain is put first you can mute everything past it.
     this.sourceNode
       .connect(this.analyserNode)
+      .connect(this.workletNode)
       .connect(this.gainNode)
-      // .connect(this.workletNode)
       .connect(this.audioContext.destination);
 
     // Start playback
@@ -146,82 +146,35 @@ export class AudioController {
     }
 
     this.analyseAudio();
-
-
-    // this is a bit roundabout but it's modern and not deprecated so whatever.
-    // 1. start the audio data processing,
-    // 2. worklet processes it, get's the bytes, sends the input to the output and sends back the bytes to here: the main thread.
-    // 3. main thread uses the bytes in the anaylyser for frequency data WHICH CAN ONLY RUN ON THE MAIN THREAD then sends that data to the worker
-    // 4. worker does cool graphics stuff with the data.
-    // ...just kinda weird I guess
-    // this.workletNode.port.onmessage = (event) => {
-    //   console.log("main thread data", event.data);
-    //   // this.analyserNode.getByteFrequencyData(event.data);
-    //   Atomics.notify(this.mutex, 0);
-    //   this.analyserNode.getByteFrequencyData(this.soundArray);
-    //   // this.messagePort!.postMessage()
-    // };
   }
 
   analyseAudio(){
-    //@ts-ignore
-    if(Atomics.load(this.mutex, 0) === 0){
-      console.log({mutex: this.mutex});
-      this.analyserNode.getByteFrequencyData(this.soundArraySwapper);
-
-      this.analyserNode.getFloatFrequencyData(this.floatFreqs);
-      console.log("analyseAudio", this.floatFreqs);
-
-      const buf = this.floatFreqs;
-      const len = buf.length;
-      var max = 0;
-      for (let ii = 0; ii < len; ++ii) {
-        const v = buf[ii];
-        if (v > max) {
-          max = v;
-        }
-      }
-
-      this.volumeBytes[3] = max;
-
-      this.volumeBytes[0] = Math.abs(this.maxSample) * 255;
-      this.volumeBytes[1] = this.sum * 255;
-      this.volumeBytes[2] = this.maxDif * 127;
-
-
-
+    const mutexMask = Atomics.load(this.mutex, 0);
+    // console.log({mutexMask});
+    if(!(mutexMask & 0x1)){
+      // console.log("AudioController", {mutex: this.mutex});
+      // we use getByteFrequency data solely for getting the volume max, and it's only usable on the main thread.
+      // if there's a better way to do this someone please let me know.
+      // i didn't want to do frequency analysis on the worker in js or wasm when it's already native.
+      this.analyserNode.getByteFrequencyData(this.byteFreqs);
+      this.getVolumeMax(this.byteFreqs);
+      
+      this.analyserNode.getFloatFrequencyData(this.soundArraySwapper);
       this.soundArray.set(this.soundArraySwapper);
-      Atomics.store(this.mutex, 0, 1);
+      // console.log("analyseAudio", this.soundArray);
+
+      Atomics.or(this.mutex, 0, 0x1);
     }
     if(this.isPlaying){
-      this.analyserNode.getFloatFrequencyData(this.floatFreqs);
-      console.log("analyseAudio", this.floatFreqs);
+      this.analyserNode.getFloatFrequencyData(this.soundArraySwapper);
+      // this.soundArray.set(this.soundArraySwapper);
+      // console.log("analyseAudio2", this.soundArraySwapper);
       requestAnimationFrame(this.analyseAudio.bind(this));
     }
   }
 
-  saveMaxSample(audioBuffer: AudioBuffer){ // TODO,
-    const buf = audioBuffer.getChannelData(0);
-    const len = buf.length;
-    var last = buf[0];
-    var max = buf[0];
-    var maxDif = 0;
-    var sum = 0;
-    for (var ii = 1; ii < len; ++ii) {
-      var v = buf[ii];
-      if (v > max) {
-        v = max;
-      }
-      var dif = Math.abs(v - last);
-      if (dif > maxDif) {
-        maxDif = dif;
-      }
-      sum += v * v;
-    }
-    this.maxSample = max;
-    this.maxDif = maxDif;
-    this.sum = Math.sqrt(sum / len);
-    console.log("maxSample", this.maxSample, this.maxDif, this.sum);
+  getVolumeMax(audioBuffer: Uint8Array){
+    this.volumeArray[3] = Math.floor(audioBuffer.reduce((acc, cur) => cur > acc? cur: acc, 0) % 256);
   }
 
   toggleMute() {
@@ -233,8 +186,8 @@ export class AudioController {
   async play() {
     if (this.audioBuffer && !this.isPlaying) {
       this.analyze(); // Assume you have a way to provide the correct MessagePort
-      await sleep(3000);
-      this.pause();
+      // await sleep(3000);
+      // this.pause();
     }
   }
 
