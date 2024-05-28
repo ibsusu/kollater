@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'preact/hooks';
-import { filer } from './core/fileStore';
+// import { filer } from './core/fileStore';
 import Dropzone from 'dropzone';
 import 'dropzone/dist/dropzone.css'; // Import the CSS for Dropzone
 
