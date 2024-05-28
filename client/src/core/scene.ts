@@ -184,6 +184,15 @@ class Scene {
       // console.log(`rendering, lag: ${lag}, sound buffer:`, this.soundTexture.image as Float32Array);
       Atomics.store(this.mutex, 0, 0);
     }
+    else {
+      if(this.volumeArray[3]){
+        this.volumeArray[0] = Math.max(0, this.volumeArray[0] - 6);
+        this.volumeArray[1] = Math.max(0, this.volumeArray[1] - 6);
+        this.volumeArray[2] = Math.max(0, this.volumeArray[2] - 6);
+        this.volumeArray[3] = Math.max(0, this.volumeArray[3] - 6);
+        this.volumeTexture.needsUpdate = true;
+      }
+    }
     this.frameCount++;
 
     this.uniforms.time.value = time*0.001;

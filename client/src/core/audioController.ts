@@ -35,14 +35,23 @@ export class AudioController {
   volumeArray!: Uint8Array;
   soundArray!: Float32Array;
   soundArraySwapper!: Float32Array;
+  audioReadyPromise!: Promise<any>;
+  audioReadyResolver: any;
+  audioReady = false;
+  analyzing = false;
 
   constructor() {
     this.audioContext = new AudioContext();
     this.analyserNode = this.audioContext.createAnalyser();
     this.byteFreqs = new Uint8Array(this.analyserNode.frequencyBinCount);
+    this.audioReadyPromise = new Promise(res => {
+      this.audioReadyResolver = res;
+    });
+
   }
 
   async init(url: string=defaultMusicUrl, messagePort?: MessagePort): Promise<void> {
+    
     // Load the Audio Worklet module
     await this.audioContext.audioWorklet.addModule(workletProcessorUrl);
 
@@ -59,11 +68,12 @@ export class AudioController {
     }
     const arrayBuffer = await response.arrayBuffer();
     this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+    this.audioReadyResolver();
   }
 
   firstStart() {
     this.play();
-    window.removeEventListener('mousedown', audioController.firstStart.bind(this));
+    window.removeEventListener('mousedown', firstStarter);
   }
 
   handleWorkerMessage(ev: MessageEvent) {
@@ -106,6 +116,11 @@ export class AudioController {
     // Ensure the audio context is resumed
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
+      if(this.analyzing) {
+        this.analyseAudio();
+        return;
+      }
+      this.analyzing = true;
     }
 
     if(this.messagePort){
@@ -182,26 +197,36 @@ export class AudioController {
   }
 
   async play() {
+    console.log("play")
+    if(!this.audioReady){await this.audioReadyPromise;}
+    this.audioReady = true;
     if (this.audioBuffer && !this.isPlaying) {
       this.analyze(); // Assume you have a way to provide the correct MessagePort
       // await sleep(3000);
       // this.pause();
+      window.dispatchEvent(new Event('audioPlaying'));
     }
   }
 
-  pause(): void {
+  async pause() {
     if (this.sourceNode && this.isPlaying) {
       console.log("PAUSING");
-      this.sourceNode.stop();
+      // this.sourceNode.stop();
+      await this.audioContext.suspend();
       this.pausedAt = this.audioContext.currentTime - this.startTime;
       this.isPlaying = false;
+      window.dispatchEvent(new Event('audioPaused'));
     }
   }
 }
 
 const audioController = new AudioController();
 
-window.addEventListener('mousedown', audioController.firstStart.bind(audioController));
+function firstStarter(){
+  audioController.firstStart()
+}
+
+window.addEventListener('mousedown', firstStarter);
 
 
 export {audioController};

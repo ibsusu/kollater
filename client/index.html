@@ -2,13 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <!-- <link rel="icon" type="image/svg+xml" href="/vite.svg" /> -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + Preact + TS</title>
+    <title>Kollator</title>
+    <script src="enable-threads.js"></script>
   </head>
   <body>
     <canvas style="position: absolute;" id="glitz" width="3000" height="2000" tabindex="-1"></canvas>
-    <div id="app" style="z-index: 2;"></div>
+    <div id="app" style="z-index: 2;height:100vh;width:100vw;"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
       // stats.js - http://github.com/mrdoob/stats.js
