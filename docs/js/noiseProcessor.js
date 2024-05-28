@@ -22,7 +22,6 @@ class NoiseProcessor extends AudioWorkletProcessor {
   process(inputs, outputs, _parameters) {
     let inputChannel = [];
     let inputChannel2 = [];
-    // console.log("noiseprocessor process");
     const input = inputs[0];
     const output = outputs[0];
     let mutexMask = Atomics.load(this.mutex, 0);
