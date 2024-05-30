@@ -49,6 +49,7 @@ export function App() {
               </p>
               <FileList title={'Cached Files'}/>
             </div>
+            <button class="" onClick={() => audioController.playDefault()}>Default Music</button>
             <button class="absolute bottom-0 right-0 w-16 h-16 rounded-full" onClick={handleAudioControl}>
               {isPlaying ? 
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">

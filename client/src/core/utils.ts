@@ -32,7 +32,7 @@ async function destroyDB() {
 }
 
 async function clearDirectory(directoryHandle: FileSystemDirectoryHandle) {
-
+  return;
   // Check if the handle has permission to read and write
   //@ts-ignore
   if ((await directoryHandle.queryPermission({ mode: 'readwrite' })) !== 'granted') {

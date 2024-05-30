@@ -1,6 +1,6 @@
 // import { sleep } from "./utils";     
 const workletProcessorUrl = "/js/noiseProcessor.js";
-const defaultMusicUrl = '/audio/a_corp.ogg';
+const defaultMusicUrl = '/audio/behold.mp3';
 
 
 /**
@@ -39,6 +39,8 @@ export class AudioController {
   audioReadyResolver: any;
   audioReady = false;
   analyzing = false;
+  defaultAudioBuffer!: AudioBuffer;
+  audioUploaded = false;
 
   constructor() {
     this.audioContext = new AudioContext();
@@ -50,24 +52,74 @@ export class AudioController {
 
   }
 
-  async init(url: string=defaultMusicUrl, messagePort?: MessagePort): Promise<void> {
-    
+  async init(musicFile?: File, messagePort?: MessagePort): Promise<void> {
+    console.log("initing");
+    if(this.audioContext?.state !== 'closed') await this.audioContext.close();
+    console.log('1')
+    this.audioContext = new AudioContext();
+    console.log('2')
+
+    this.analyserNode = this.audioContext.createAnalyser();
+    console.log('3')
+
+    if(this.workletNode) {
+      this.workletNode.disconnect();
+      //@ts-ignore
+      this.workletNode = undefined;
+    }
+
+    console.log('4');
+
+    if(!this.defaultAudioBuffer){
+      console.log('5');
+      const response = await fetch(defaultMusicUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio file: ${response.statusText}`);
+      }
+    console.log('6')
+
+      const arrayBuffer = await response.arrayBuffer();
+    console.log('7', arrayBuffer);
+      try{ // adding this because there could be failures on certain types of media.
+        this.defaultAudioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      }
+      catch(e){
+        console.warn("couldn't decode the audio.");
+      }
+    }
+    console.log('8')
+
+    if(musicFile){
+      console.log('music file exists');
+      this.audioUploaded = true;
+      try{ // adding this because there could be failures on certain types of media.
+        this.audioBuffer = await this.audioContext.decodeAudioData(await musicFile.arrayBuffer());
+      }
+      catch(e){
+        console.warn("couldn't decode the audio.");
+      }
+    }
+    else{
+      console.log('music file doesnt exist');
+
+    }
+
     // Load the Audio Worklet module
     await this.audioContext.audioWorklet.addModule(workletProcessorUrl);
 
+    if(!this.workletNode){
+      this.workletNode = new AudioWorkletNode(this.audioContext, 'noise-processor');
+      this.messagePort = messagePort;
+      if(this.messagePort){
+        this.messagePort.onmessage = this.handleWorkerMessage.bind(this);
+      }
+      this.workletNode.port.postMessage({
+        reason: 'initialize',
+        mutexBuffer: this.mutexBuffer,
+        volumeBuffer: this.volumeBuffer
+      });
+    }
     // Create an AudioWorkletNode
-    this.workletNode = new AudioWorkletNode(this.audioContext, 'noise-processor');
-    this.messagePort = messagePort;
-    if(this.messagePort){
-      this.messagePort.onmessage = this.handleWorkerMessage.bind(this);
-      console.log("audiocontroller checking messageport", this.messagePort);
-    }
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch audio file: ${response.statusText}`);
-    }
-    const arrayBuffer = await response.arrayBuffer();
-    this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
     this.audioReadyResolver();
   }
 
@@ -77,7 +129,7 @@ export class AudioController {
   }
 
   handleWorkerMessage(ev: MessageEvent) {
-    console.log("handleWorkerMessage", ev);
+    // console.log("handleWorkerMessage", ev);
     if(ev.data.reason === 'audioConnectionRequest'){
       this.messagePort!.postMessage({reason: 'audioConnected',  frequencyBinCount: this.analyserNode.frequencyBinCount});
     }
@@ -108,7 +160,7 @@ export class AudioController {
     this.isPlaying = true;
     console.log("isPlaying", this.isPlaying);
     this.startTime = Date.now();
-    if (!this.audioBuffer) {
+    if (!this.audioBuffer && !this.defaultAudioBuffer) {
       console.error("Audio not loaded");
       return;
     }
@@ -116,11 +168,11 @@ export class AudioController {
     // Ensure the audio context is resumed
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
+      console.log("suspended, now resuming");
       if(this.analyzing) {
         this.analyseAudio();
         return;
       }
-      this.analyzing = true;
     }
 
     if(this.messagePort){
@@ -133,7 +185,7 @@ export class AudioController {
     // Create an AudioBufferSourceNode
     this.sourceNode = this.audioContext.createBufferSource();
     // set the audio buffer that we fetched as the sourceNode's input buffer
-    this.sourceNode.buffer = this.audioBuffer;
+    this.sourceNode.buffer = this.audioBuffer ?? this.defaultAudioBuffer;
     this.analyserNode.fftSize = 2048;  // defaults to 2048 but we're going to explicitly set it.
     const bufferLength = this.analyserNode.frequencyBinCount; // should be half the fftSize, so 1024
     console.log("BUFFERLENGTH", bufferLength);
@@ -148,7 +200,7 @@ export class AudioController {
       .connect(this.workletNode)
       .connect(this.gainNode)
       .connect(this.audioContext.destination);
-
+    this.pausedAt = 0;
     // Start playback
     this.sourceNode.start(0, this.pausedAt);
 
@@ -156,10 +208,17 @@ export class AudioController {
     
     this.sourceNode.onended = (_ev) => {
       this.isPlaying = false;
+      this.analyzing = false;
       window.dispatchEvent(new Event('audioPaused'));
     }
-
+    this.analyzing = true;
     this.analyseAudio();
+  }
+
+  async addMusic(file: File){
+    await this.stop();
+    await this.init(file);
+    await this.play();
   }
 
   analyseAudio(){
@@ -198,26 +257,46 @@ export class AudioController {
   }
 
   async play() {
-    console.log("play")
+    console.log("play", this.sourceNode, this.isPlaying, this.audioContext.state);
     if(!this.audioReady){await this.audioReadyPromise;}
+    console.log("after audio ready", !!this.audioBuffer, this.isPlaying);
     this.audioReady = true;
-    if (this.audioBuffer && !this.isPlaying) {
-      this.analyze(); // Assume you have a way to provide the correct MessagePort
+    if ((this.audioBuffer || this.defaultAudioBuffer) && !this.isPlaying) {
+      console.log("should be playing");
+      await this.analyze(); // Assume you have a way to provide the correct MessagePort
       // await sleep(3000);
       // this.pause();
       window.dispatchEvent(new Event('audioPlaying'));
     }
   }
 
+  async playDefault(){
+    if(this.isPlaying) await this.stop(); // clears audioBuffer
+    await this.init()
+    await this.play();
+  }
+
+  
   async pause() {
     if (this.sourceNode && this.isPlaying) {
-      console.log("PAUSING");
+      console.log("PAUSING", this.sourceNode, this.isPlaying);
       // this.sourceNode.stop();
       await this.audioContext.suspend();
       this.pausedAt = this.audioContext.currentTime - this.startTime;
       this.isPlaying = false;
       window.dispatchEvent(new Event('audioPaused'));
     }
+  }
+  async stop() {
+    console.log('STOPPING');
+    if(this.sourceNode && this.isPlaying){
+      this.isPlaying = false;
+      this.analyzing = false;
+      this.analyzing = false;
+      await this.audioContext.suspend();
+    }
+    await this.audioContext.close();
+    this.audioBuffer = null;
   }
 }
 
@@ -227,7 +306,7 @@ function firstStarter(){
   audioController.firstStart()
 }
 
-window.addEventListener('mousedown', firstStarter);
+// window.addEventListener('mousedown', firstStarter);
 
 
 export {audioController};

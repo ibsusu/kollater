@@ -45,6 +45,7 @@ export class Filer {
     let directory = await navigator.storage.getDirectory();
 
     let dbHandle = await directory.getFileHandle("kollatorDb", {create: true});
+    if(!dbHandle) return {handle: dbHandle, files: new Map<string, MetaData>(), name: 'Anon', email: 'anon@kollator.com', password: 'password123lol', provider: 'email'};
     let dbFile = await dbHandle.getFile();
     let dbJSON = await dbFile.text();
 
@@ -76,6 +77,7 @@ export class Filer {
   }
 
   async save() {
+    if(!this.db.handle.createWritable) return;
     const dbWriteStream = await this.db.handle.createWritable();
     await dbWriteStream.write(JSON.stringify({...this.db, files: Array.from(this.db.files.entries())}));
     await dbWriteStream.close();

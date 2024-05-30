@@ -275,8 +275,8 @@ void main() {gl_PointSize=1.0;
   float y = (.0 + sin(n * PI) * segId * 0.0000015 * s * ratio)*1./  cos(segId)*step2;
   
   
-  x += cos(vertexId/vertexCount * PI * 2.)*(v*radius*2.+segId*0.002)*(step0+step1);
-  y += sin(vertexId/vertexCount * PI * 2.)*ratio*(v*radius*2.+segId*0.00189)*(step0+step1);
+  x += cos(vertexId/vertexCount * PI * 2.)*(v*radius+segId*0.002)*(step0+step1);
+  y += sin(vertexId/vertexCount * PI * 2.)*ratio*(v*radius+segId*0.00189)*(step0+step1);
   // float z = segId * 0.006;
   // float z = sin(segId * 0.006) * 0.5;
   float z = 0.7*step2-abs(cos(segId-.1)/0.9) *step2;

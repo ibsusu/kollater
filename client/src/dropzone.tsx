@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'preact/hooks';
 // import { filer } from './core/fileStore';
 import Dropzone from 'dropzone';
 import 'dropzone/dist/dropzone.css'; // Import the CSS for Dropzone
+import { audioController } from './core/audioController';
 
 
 export const DropzoneComponent = () => {
@@ -25,6 +26,7 @@ export const DropzoneComponent = () => {
                 this.on("addedfile", file => {
                     console.log("Added file:", file);
                     // filer.importFile(file);
+                    audioController.addMusic(file);
                 });
                 this.on("removedfile", file => {
                     console.log("Removed file:", file);
@@ -41,7 +43,7 @@ export const DropzoneComponent = () => {
     return (
       <>
         <div ref={dropzoneRef} className="dropzone bg-gray-500 hover:bg-purple-200 opacity-70 hover:opacity-80 text-grey-200 bg-red cursor-not-allowed" >
-            <div class="dz-message" data-dz-message><span>File uploading is currently disabled.</span></div>
+            <div class="dz-message" data-dz-message><span>Choose some music from your machine.</span></div>
         </div>
       </>
     );
