@@ -17,3 +17,4 @@ chunkStream.pipe(peer)
 
 chunkStream.write(myData)
 https://chatgpt.com/c/82e3fa4e-0338-469b-91f6-2a9e8a865490
+https://news.ycombinator.com/item?id=40408515
