@@ -34,6 +34,8 @@ export interface Database {
   email: string;
   password: string;
   provider: string;
+  ed25519PublicKey?: string;  // Base64 encoded Ed25519 public key
+  ed25519PrivateKey?: string; // Base64 encoded Ed25519 private key
 }
 
 export interface TorrentMetadata {
@@ -62,5 +64,8 @@ export interface TorrentMetadata {
         hashes: string[]; // Array of SHA-256 hashes for V2
       };
     };
+    // Optional signing fields
+    "owner-public-key"?: string; // Ed25519 public key (base64)
+    "signature"?: string; // Ed25519 signature of info dict (base64)
   };
 }

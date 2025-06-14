@@ -12,7 +12,11 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",
+    "@types/bun": "latest",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.569.0"
   }
 }

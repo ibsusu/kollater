@@ -2,11 +2,12 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  fullyParallel: true,
+  fullyParallel: false, // Disable parallel execution to prevent multiple tests running
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1, // Force sequential execution with single worker
   reporter: 'html',
+  timeout: 60000, // Increase timeout for comprehensive tests
   use: {
     baseURL: 'https://kollator.local:5173',
     trace: 'on-first-retry',

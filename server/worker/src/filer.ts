@@ -8,7 +8,7 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { subtle } from "crypto";
-import {region, accessKeyId, secretAccessKey, STORAGE_CAPACITY, dirGeneral, dir410, bucketGeneral, encryptionKey} from './constants'
+import {region, accessKeyId, secretAccessKey, endpoint, STORAGE_CAPACITY, dirGeneral, dir410, bucketGeneral, bucketTorrents, encryptionKey} from './constants'
 import { createCipheriv, createDecipheriv } from 'crypto';
 import { createReadStream } from "node:fs";
 import { readdir, unlink } from "node:fs/promises";
@@ -24,10 +24,15 @@ export class Filer {
   requestCounts: Map<string, number>;
 
   constructor(){
-    this.s3 = new S3Client({region, credentials:{
-      accessKeyId,
-      secretAccessKey
-    }});
+    this.s3 = new S3Client({
+      region, 
+      endpoint,
+      forcePathStyle: true, // Required for MinIO
+      credentials:{
+        accessKeyId,
+        secretAccessKey
+      }
+    });
     this.capacity = Number(STORAGE_CAPACITY);
     this.requestCounts = new Map();
     setInterval(() => this.updateCache(), 1000*60);
@@ -59,10 +64,26 @@ export class Filer {
     // read all the files in the current directory
     const filesInDirectory = (await readdir(dirGeneral));
 
-    const filesToRemove = filesInDirectory.filter(file => !topRequested.includes(splitOnLastHyphen(file)[0]));
+    const filesToRemove = filesInDirectory.filter(file => {
+      // Don't remove directories (chunks, torrents)
+      if (file === 'chunks' || file === 'torrents' || file === '.keep') {
+        return false;
+      }
+      return !topRequested.includes(splitOnLastHyphen(file)[0]);
+    });
+    
     console.log({filesInDirectory, filesToRemove});
     for( let file of filesToRemove){
-      await unlink(file);
+      try {
+        const filePath = `${dirGeneral}/${file}`;
+        const stat = await Bun.file(filePath).exists();
+        if (stat) {
+          await unlink(filePath);
+          console.log(`Removed file: ${filePath}`);
+        }
+      } catch (error: any) {
+        console.log(`Failed to unlink file ${file}:`, error.message);
+      }
     }
   }
 
@@ -94,7 +115,7 @@ export class Filer {
     let filePath;
     for await (const fp of glob.scan(`/tmp/${dirGeneral}/`)) {
       console.log(fp);
-      filePath = fp;
+      filePath = `/tmp/${dirGeneral}/${fp}`;
       break;
     }
     if(!filePath) throw("File doesn't exist, can't upload to s3");
@@ -143,5 +164,3 @@ export class Filer {
   }
 
 }
-
-

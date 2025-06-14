@@ -258,12 +258,19 @@ class CoreWorker {
   }
 
   async writeFileAndTorrent(directory: FileSystemDirectoryHandle, fileName: string, file: File, metadata: TorrentMetadata){
-    const fileHandle = await directory.getFileHandle(fileName, {create: true});
+    // Sanitize filename for OPFS compatibility
+    const safeFileName = fileName
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '')
+      .replace(/[^a-zA-Z0-9\-_]/g, ''); // Remove any other invalid characters
+    
+    const fileHandle = await directory.getFileHandle(safeFileName, {create: true});
     const writableStream = await fileHandle.createWritable();
     await writableStream.write(file);
     await writableStream.close();
 
-    const metadataHandle = await directory.getFileHandle(fileName+'torrent', {create: true});
+    const metadataHandle = await directory.getFileHandle(safeFileName+'torrent', {create: true});
     const metastream = await metadataHandle.createWritable();
     await metastream.write(JSON.stringify(metadata));
     await metastream.close();

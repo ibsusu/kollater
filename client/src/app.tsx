@@ -6,6 +6,7 @@ import {slogan} from './core/utils';
 import { FileExplorer } from './fileExplorer';
 import { audioController } from './core/audioController';
 import { useEffect, useState } from 'preact/hooks';
+import { filer } from './core/fileStore';
 init();
 const subtext = slogan();
 export function App() {

@@ -34,7 +34,7 @@ export class Filer {
   initResolver!: (value: void | PromiseLike<void>) => void;
   worker!: CoreWorker; // singleton
   clock?: number;
-  simpleMode: boolean = true; // Enable simple mode by default for testing
+  simpleMode: boolean = false; // Disable simple mode to test WebRTC upload workflow
 
   constructor() {
     this.events = new Map<string, Event>();
@@ -110,69 +110,86 @@ export class Filer {
     await this.save();
     this.dispatch('importedFile');
     
-    // Skip upload in simple mode
-    if (!this.simpleMode) {
-      await this.uploadFile(metaData.hash);
-    }
+    // Always try to upload (both simple and full mode)
+    await this.uploadFile(metaData.hash);
   }
 
   async uploadFile(fileHash: string) {
-    console.log({fileHash});
+    console.log("Starting upload for file hash:", fileHash);
 
-    // get the torrent data, do some funny crypto stuff
-    // send it to a peer who then sends it to s3
-    const rootDirectory = await navigator.storage.getDirectory();
-    const metadataHandle = await rootDirectory.getFileHandle(fileHash+'torrent');
-    const metadataFile = await metadataHandle.getFile();
-    const fileHandle = await rootDirectory.getFileHandle(fileHash);
-    const file = await fileHandle.getFile();
-
-    const chunkLength = 5*1024**2;
-    let metadataBytes = new Uint8Array(await metadataFile.arrayBuffer());
-    let metadataString = await metadataFile.text();
-    const metadata = JSON.parse(metadataString) as unknown as TorrentMetadata;
-    // metadataFiles are below 5MiB right now
-    console.log("filestoreupload", {metadata, metadataBytes});
-    let metadataHash = await crypto.subtle.digest('SHA-256', metadataBytes);
-    let metadataHashString = bytesTob64(new Uint8Array(metadataHash));
-    // AES-GCM requires a key and a nonce.  it's ok if the nonces are sequential, they just can't be reused.
-    // the initial nonce is used for the metadata.  
-    const key = await importKeyFromBase64(metadata.info.key); 
-    const iv = b64ToBytes(metadata.info.iv);
-    this.dispatch('uploadingFile');
-    // this should only fire once, since the file is always smaller than 5MiB
-    // @ts-ignore
-    for await (const chunk of await this.worker.encryptFileForUpload(metadataFile, chunkLength, [metadataHashString], key, iv)){
-      let chunkHash = await crypto.subtle.digest('SHA-256', chunk);
-      console.log("uploading chunkHash:", bytesTob64(new Uint8Array(chunkHash)), chunkHash.byteLength);
-      let uploadResponse = await comms.upload(new Uint8Array(chunkHash), chunk);
-      let ok = uploadResponse[0];
-      if(!ok) {
-        this.dispatch('error');
-        console.error("couldn't upload the metadata file");
+    try {
+      const rootDirectory = await navigator.storage.getDirectory();
+      
+      // Check if we're in simple mode
+      if (this.simpleMode) {
+        console.log("Simple mode upload - sending file directly");
+        
+        // In simple mode, just send the file directly
+        const fileHandle = await rootDirectory.getFileHandle(fileHash);
+        const file = await fileHandle.getFile();
+        const fileData = new Uint8Array(await file.arrayBuffer());
+        
+        // Create hash for the file
+        const buffer = new ArrayBuffer(fileData.length);
+        const view = new Uint8Array(buffer);
+        view.set(fileData);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+        const hash = new Uint8Array(hashBuffer);
+        
+        this.dispatch('uploadingFile');
+        
+        // Upload the file data directly
+        const uploadResponse = await comms.upload(hash, fileData as Uint8Array);
+        const success = uploadResponse && uploadResponse[0] === 1;
+        
+        if (success) {
+          console.log("Simple mode upload successful");
+          this.dispatch('uploadedFile');
+        } else {
+          console.error("Simple mode upload failed");
+          this.dispatch('filererror');
+        }
         return;
       }
-    }
-    
-    //---- the metadata file is uploaded so now let's actually upload the file
-    let merkleHashStrings = Object.values(metadata.info.layers)[0].hashes;
-    let chunkIndex = 0;
-    let ivInc = iv.slice();
 
-    incrementIV(ivInc); // must increment, no reuse.
-    //@ts-ignore
-    for await (const chunk of await this.worker.encryptFileForUpload(file, chunkLength, merkleHashStrings, key, ivInc)){
-      // we hash the encrypted file chunk
-      let chunkHash = await crypto.subtle.digest('SHA-256', chunk);
-      // let hash = new Uint8Array(await crypto.subtle.digest('SHA-256',b64ToBytes(merkleHashStrings[chunkIndex])));
-      //@ts-ignore
-      let uploadResponse = await comms.upload(new Uint8Array(chunkHash), chunk.length, chunk); // TODO NOT DONE YET
-      let ok = uploadResponse[0];
-      if(!ok) console.error(`upload of file ${file.name} failed, chunk index: ${chunkIndex}`);
-    }
+      // Full mode upload with torrent processing using new streaming protocol
+      // Sanitize filename for OPFS compatibility
+      const safeFileHash = fileHash
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '')
+        .replace(/[^a-zA-Z0-9\-_]/g, '');
+      const metadataHandle = await rootDirectory.getFileHandle(safeFileHash + 'torrent');
+      const metadataFile = await metadataHandle.getFile();
+      const fileHandle = await rootDirectory.getFileHandle(fileHash);
+      const file = await fileHandle.getFile();
 
-    // ok we're done
-    this.dispatch('uploadedFile')
+      let metadataString = await metadataFile.text();
+      const metadata = JSON.parse(metadataString) as unknown as TorrentMetadata;
+      
+      console.log("Full mode streaming upload", { metadata, fileSize: file.size });
+      
+      // Create torrent hash from metadata
+      const metadataBytes = new TextEncoder().encode(metadataString);
+      const torrentHash = new Uint8Array(await crypto.subtle.digest('SHA-256', metadataBytes));
+      
+      this.dispatch('uploadingFile');
+      
+      try {
+        // Use new streaming upload protocol
+        await comms.streamUpload(torrentHash, metadata, file);
+        console.log("Streaming upload completed successfully");
+        this.dispatch('uploadedFile');
+      } catch (error) {
+        console.error("Streaming upload failed:", error);
+        this.dispatch('filererror');
+        return;
+      }
+      
+    } catch (error) {
+      console.error("Upload failed with error:", error);
+      this.dispatch('filererror');
+    }
   }
 
   async exportFile(fileHash: string){

@@ -47,8 +47,8 @@ export async function processFile(inputFile: File) {
       const chunk = file.slice(offset, offset + chunkSize);
       const hash = await hashChunk(chunk);
       leafHashes.push(hash);
-      // temporarily not saving for testing and dev
-      // await saveChunkToOPFS(chunk, hash);
+      // Save chunk to OPFS for verification
+      await saveChunkToOPFS(chunk, hash);
       offset += chunkSize;
   }
 
@@ -62,14 +62,21 @@ async function hashChunk(chunk: Blob) {
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-// async function saveChunkToOPFS(chunk: Blob, hash: string) {
-//   const directoryHandle = await window.showDirectoryPicker();
-//   const fileHandle = await directoryHandle.getFileHandle(hash, { create: true });
-//   const writable = await fileHandle.createWritable();
-//   const blob = new Blob([chunk], { type: 'application/octet-stream' });
-//   await writable.write(blob);
-//   await writable.close();
-// }
+async function saveChunkToOPFS(chunk: Blob, hash: string) {
+  try {
+    const directory = await navigator.storage.getDirectory();
+    // Sanitize hash for OPFS filename compatibility
+    const safeHash = hash.replace(/[^a-zA-Z0-9\-_]/g, '');
+    const fileHandle = await directory.getFileHandle(safeHash, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(chunk);
+    await writable.close();
+    console.log(`Chunk saved to OPFS: ${safeHash} (original: ${hash})`);
+  } catch (error) {
+    console.error(`Failed to save chunk ${hash} to OPFS:`, error);
+    throw error;
+  }
+}
 
 //@ts-ignore
 async function generateMerkleRoot(hashes) {
@@ -84,10 +91,15 @@ async function generateMerkleRoot(hashes) {
   return generateMerkleRoot(newHashes);
 }
 
-//@ts-ignore
-async function hashPair(hash1, hash2) {
+async function hashPair(hash1: string, hash2: string): Promise<string> {
+  const combinedString = hash1 + hash2;
   const encoder = new TextEncoder();
-  const data = encoder.encode(hash1 + hash2);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+  const data = encoder.encode(combinedString);
+  // Create a new ArrayBuffer from the Uint8Array to avoid type issues
+  const buffer = new ArrayBuffer(data.length);
+  const view = new Uint8Array(buffer);
+  view.set(data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArray = new Uint8Array(hashBuffer);
+  return Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
 }

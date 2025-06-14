@@ -227,7 +227,7 @@ Bun.serve({
       cert: Bun.file("../../certs/kollator.local+4.pem"),
     },
     message(ws, data) {
-      // console.log({data, len: data.length});
+      console.log({data, len: data.length});
       //@ts-ignore
       if (data.length || data.type === 'utf8') {
         //@ts-ignore
@@ -236,6 +236,7 @@ Bun.serve({
         if(!message.reason) return;
         switch(message.reason){
           case 'register':
+            console.log('register path hit');
             handleRegister(ws, message);
             break;
           case 'signal':

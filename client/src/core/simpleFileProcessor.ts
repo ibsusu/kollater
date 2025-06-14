@@ -11,7 +11,8 @@ export class SimpleFileProcessor {
     const hash = bytesTob64(new Uint8Array(hashBuffer))
       .replace(/\+/g, '-')  // Replace + with -
       .replace(/\//g, '_')  // Replace / with _
-      .replace(/=/g, '');   // Remove padding =
+      .replace(/=/g, '')    // Remove padding =
+      .replace(/[^a-zA-Z0-9\-_]/g, ''); // Remove any other invalid characters
     
     // Store the file directly in OPFS
     const fileHandle = await directory.getFileHandle(hash, { create: true });
