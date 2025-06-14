@@ -23,9 +23,14 @@ export const DropzoneComponent = () => {
             addRemoveLinks: true,
 
             init: function() {
-                this.on("addedfile", file => {
+                this.on("addedfile", async file => {
                     console.log("Added file:", file);
-                    filer.importFile(file);
+                    try {
+                        await filer.importFile(file);
+                        console.log("File imported successfully:", file.name);
+                    } catch (error) {
+                        console.error("Error importing file:", error);
+                    }
                     audioController.addMusic(file);
                 });
                 this.on("removedfile", file => {

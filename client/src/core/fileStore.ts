@@ -208,12 +208,19 @@ export const filer = new Filer();
 // window.addEventListener('load', filer.init);
 
 export const useFiler = () => {
-  const [files, setFiles] = useState<MetaData[]>(Array.from(filer.db.files.values()));
+  const [files, setFiles] = useState<MetaData[]>([]);
 
   useEffect(() => {
     const handleimportedFile = () => {
-      setFiles(Array.from(filer.db.files.values()));
+      if (filer.db && filer.db.files) {
+        setFiles(Array.from(filer.db.files.values()));
+      }
     };
+
+    // Initialize files if filer is already ready
+    if (filer.db && filer.db.files) {
+      setFiles(Array.from(filer.db.files.values()));
+    }
 
     window.addEventListener('importedFile', handleimportedFile);
     return () => {

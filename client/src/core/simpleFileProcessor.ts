@@ -8,7 +8,10 @@ export class SimpleFileProcessor {
     // Generate a simple hash for the file
     const fileBuffer = await file.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest('SHA-256', fileBuffer);
-    const hash = bytesTob64(new Uint8Array(hashBuffer));
+    const hash = bytesTob64(new Uint8Array(hashBuffer))
+      .replace(/\+/g, '-')  // Replace + with -
+      .replace(/\//g, '_')  // Replace / with _
+      .replace(/=/g, '');   // Remove padding =
     
     // Store the file directly in OPFS
     const fileHandle = await directory.getFileHandle(hash, { create: true });

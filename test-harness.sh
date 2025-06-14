@@ -123,20 +123,46 @@ run_tests() {
     
     cd tests
     
-    # Run tests with different options based on arguments
-    if [ "$1" = "--headed" ]; then
-        print_status "Running tests in headed mode..."
-        bun run test:headed
-    elif [ "$1" = "--debug" ]; then
-        print_status "Running tests in debug mode..."
-        bun run test:debug
-    elif [ "$1" = "--ui" ]; then
-        print_status "Running tests with UI..."
-        bun run test:ui
-    else
+    # Build the test command
+    local test_cmd="npx playwright test"
+    local test_args=""
+    
+    # Parse arguments
+    for arg in "$@"; do
+        case "$arg" in
+            "--headed")
+                test_args="$test_args --headed"
+                print_status "Running tests in headed mode..."
+                ;;
+            "--debug")
+                test_args="$test_args --debug"
+                print_status "Running tests in debug mode..."
+                ;;
+            "--ui")
+                test_args="$test_args --ui"
+                print_status "Running tests with UI..."
+                ;;
+            --grep=*)
+                test_args="$test_args $arg"
+                print_status "Running specific test: ${arg#--grep=}"
+                ;;
+            *)
+                # If it doesn't start with --, treat it as a grep pattern
+                if [[ ! "$arg" =~ ^-- ]]; then
+                    test_args="$test_args --grep \"$arg\""
+                    print_status "Running specific test: $arg"
+                fi
+                ;;
+        esac
+    done
+    
+    # If no specific mode was set, default to headless
+    if [[ ! "$test_args" =~ (--headed|--debug|--ui) ]]; then
         print_status "Running tests in headless mode..."
-        bun run test
     fi
+    
+    # Execute the test command
+    eval "$test_cmd $test_args"
     
     cd ..
 }
@@ -187,7 +213,8 @@ main() {
             install_test_deps
             start_servers
             health_check
-            run_tests "$2"
+            shift # Remove "test" from arguments
+            run_tests "$@"
             ;;
         "manual")
             check_dependencies
