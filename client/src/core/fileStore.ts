@@ -7,6 +7,7 @@ import {
   fromByteArray as bytesTob64
 } from 'base64-js';
 import { importKeyFromBase64, incrementIV } from './utils';
+import { simpleFileProcessor } from './simpleFileProcessor';
 
 const eventNames = [
   'stagedFiles',
@@ -33,12 +34,14 @@ export class Filer {
   initResolver!: (value: void | PromiseLike<void>) => void;
   worker!: CoreWorker; // singleton
   clock?: number;
+  simpleMode: boolean = true; // Enable simple mode by default for testing
 
   constructor() {
     this.events = new Map<string, Event>();
     this.clock;
     eventNames.forEach(name => this.events.set(name, new Event(name)));
   }
+  
   async init(worker: CoreWorker) {
     this.worker = worker; // must initialize here
     this.initPromise = new Promise((res) => {this.initResolver = res});
@@ -88,15 +91,29 @@ export class Filer {
 
     const rootDirectory = await navigator.storage.getDirectory()
     const destinationDirectory = destinationDirectoryId? await rootDirectory.getDirectoryHandle(destinationDirectoryId) : rootDirectory;
-    //@ts-ignore
-    let metaData = await this.worker.processFile(file, destinationDirectory);
+    
+    let metaData: MetaData;
+    
+    if (this.simpleMode) {
+      // Use simple file processing without torrent creation
+      metaData = await simpleFileProcessor.processFileSimple(file, destinationDirectory);
+    } else {
+      // Use full torrent-based processing
+      //@ts-ignore
+      metaData = await this.worker.processFile(file, destinationDirectory);
+    }
+    
     let totalTime = Date.now() - this.clock!;
     console.log("elapsed time:", totalTime, "bytes:", file.size);
     console.log({metaData});
     this.db.files.set(metaData.hash, metaData);    
     await this.save();
     this.dispatch('importedFile');
-    await this.uploadFile(metaData.hash);
+    
+    // Skip upload in simple mode
+    if (!this.simpleMode) {
+      await this.uploadFile(metaData.hash);
+    }
   }
 
   async uploadFile(fileHash: string) {

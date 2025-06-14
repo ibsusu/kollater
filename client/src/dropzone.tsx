@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'preact/hooks';
 import { filer } from './core/fileStore';
 import Dropzone from 'dropzone';
 import 'dropzone/dist/dropzone.css'; // Import the CSS for Dropzone
-// import { audioController } from './core/audioController';
+import { audioController } from './core/audioController';
 
 
 export const DropzoneComponent = () => {
@@ -26,7 +26,7 @@ export const DropzoneComponent = () => {
                 this.on("addedfile", file => {
                     console.log("Added file:", file);
                     filer.importFile(file);
-                    // audioController.addMusic(file);
+                    audioController.addMusic(file);
                 });
                 this.on("removedfile", file => {
                     console.log("Removed file:", file);

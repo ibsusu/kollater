@@ -3,7 +3,7 @@ import './app.css'
 import {DropzoneComponent} from './dropzone';
 import {init, useCore} from './core/core';
 import {slogan} from './core/utils';
-import { FileList } from './fileList';
+import { FileExplorer } from './fileExplorer';
 import { audioController } from './core/audioController';
 import { useEffect, useState } from 'preact/hooks';
 init();
@@ -47,7 +47,7 @@ export function App() {
               <p class="read-the-docs select-none">
                 {subtext}
               </p>
-              <FileList title={'Cached Files'}/>
+              <FileExplorer title={'OPFS File Explorer'}/>
             </div>
             {/* <button class="" onClick={() => audioController.playDefault()}>Default Music</button> */}
             <button class="absolute bottom-0 right-0 w-16 h-16 rounded-full" onClick={handleAudioControl}>

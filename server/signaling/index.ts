@@ -2,8 +2,8 @@ import { randomUUID, type UUID } from "crypto";
 import { Queue } from '@datastructures-js/queue';
 import { MinPriorityQueue } from "@datastructures-js/priority-queue";
 import Peer, {type Instance as SimplePeerInstance }from 'simple-peer';
-import nodeDatachannelPolyfill from './node-datachannel/polyfill/index.js';
-import * as nodeDataChannel from './node-datachannel/lib/index.js';
+import nodeDatachannelPolyfill from './node-datachannel/src/polyfill/index.ts';
+import * as nodeDataChannel from './node-datachannel/src/lib/index.ts';
 import { heapStats } from "bun:jsc";
 import { RTC_MESSAGE_REASON as REASON } from "./src/constants";
 import { bmsg as b } from './src/utils';
@@ -204,8 +204,8 @@ function handleRelay(peer: KPeer, data: Uint8Array){
 Bun.serve({
   port: 8000,
   tls: {
-    key: Bun.file("../../certs/_wildcard.kollator.local+3-key.pem"),
-    cert: Bun.file("../../certs/_wildcard.kollator.local+3.pem"),
+    key: Bun.file("../../certs/kollator.local+4-key.pem"),
+    cert: Bun.file("../../certs/kollator.local+4.pem"),
   },
   hostname: "kollator.local",
   fetch(req, server) {
@@ -223,8 +223,8 @@ Bun.serve({
   websocket: {
     //@ts-ignore
     tls: {
-      key: Bun.file("../../certs/_wildcard.kollator.local+3-key.pem"),
-      cert: Bun.file("../../certs/_wildcard.kollator.local+3.pem"),
+      key: Bun.file("../../certs/kollator.local+4-key.pem"),
+      cert: Bun.file("../../certs/kollator.local+4.pem"),
     },
     message(ws, data) {
       // console.log({data, len: data.length});

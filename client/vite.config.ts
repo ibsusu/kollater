@@ -41,8 +41,8 @@ export default defineConfig({
     port: 5173,
     host: 'kollator.local',
     https: {
-      cert: '../certs/_wildcard.kollator.local+3.pem',
-      key: '../certs/_wildcard.kollator.local+3-key.pem'
+      cert: '../certs/kollator.local+4.pem',
+      key: '../certs/kollator.local+4-key.pem'
     }
   }
 })

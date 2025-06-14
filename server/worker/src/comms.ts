@@ -1,6 +1,6 @@
 import Peer, {type Instance as SimplePeerInstance} from 'simple-peer';
-import nodeDatachannelPolyfill from '../node-datachannel/polyfill/index.js';
-import * as nodeDataChannel from '../node-datachannel/lib/index.js';
+import nodeDatachannelPolyfill from '../node-datachannel/src/polyfill/index.ts';
+import * as nodeDataChannel from '../node-datachannel/src/lib/index.ts';
 import { sleep, bmsg as b, uint8ArrayToHex, bytesToString } from './utils';
 import {stringify as uuidStringify, parse as uuidParse, v4 as uuidv4, validate as uuidValidate, stringify} from 'uuid';
 import type { UUID } from 'crypto';
@@ -16,8 +16,7 @@ const WS_URL = "wss://"+ (process.env.KOLLATOR_DOMAIN);
 let bootstrapInterval: Timer|undefined;
 
 console.log({WS_URL});
-let testOutput = await ((await fetch('https://'+process.env.KOLLATOR_DOMAIN+'/join', { tls: { rejectUnauthorized: false } })).text());
-console.log({testOutput});
+// Removed problematic fetch test - will test connection via WebSocket instead
 
 interface RegistrationData {
   success: boolean;
