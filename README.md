@@ -8,8 +8,21 @@ A browser-based peer-to-peer file sharing application utilizing WebRTC mesh netw
 - Bun runtime (for servers)
 - Node.js/npm (for client)
 - mkcert (for local SSL certificates)
+- Git (for submodule initialization)
 
-### 1. Setup SSL Certificates with mkcert
+### 1. Initialize Git Submodules
+
+The project uses git submodules for node-datachannel dependencies. Initialize them first:
+
+```bash
+# Clone the repository with submodules
+git clone --recursive <repository-url>
+
+# Or if you already cloned without --recursive, initialize submodules:
+git submodule update --init --recursive
+```
+
+### 2. Setup SSL Certificates with mkcert
 
 First, install and setup mkcert for local SSL certificates:
 
@@ -46,19 +59,19 @@ mkcert kollator.local "*.kollator.local"
 # - kollator.local+1-key.pem (private key)
 ```
 
-### 2. Start the Testbed
+### 3. Start the Testbed
 ```bash
 # Start all components as binaries
 ./start-testbed.sh
 ```
 
-### 3. Check Status
+### 4. Check Status
 ```bash
 # Check if everything is running properly
 ./check-testbed.sh
 ```
 
-### 4. Access the Application
+### 5. Access the Application
 - **Client App**: https://kollator.local:5173 (SSL certificate trusted via mkcert)
 - **Signaling Server**: https://kollator.local:8000 (SSL certificate trusted via mkcert)
 
@@ -171,7 +184,26 @@ chunkStream.write(myData)
    # Rename to mkcert.exe and add to PATH
    ```
 
-3. **Port Conflicts**
+3. **Submodule Issues**
+   
+   If you're getting errors related to node-datachannel or missing dependencies:
+   
+   ```bash
+   # Check submodule status
+   git submodule status
+   
+   # If submodules are not initialized or out of sync:
+   git submodule update --init --recursive
+   
+   # If you need to update submodules to latest commits:
+   git submodule update --remote --recursive
+   
+   # If submodule URLs have changed or you have SSH key issues:
+   git submodule sync --recursive
+   git submodule update --init --recursive
+   ```
+
+4. **Port Conflicts**
    ```bash
    # Check what's using ports
    lsof -i :8000  # Signaling server
