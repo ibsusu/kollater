@@ -5,7 +5,7 @@ A browser-based peer-to-peer file sharing application utilizing WebRTC mesh netw
 ## Quick Start (Demo)
 
 ### Prerequisites
-- Node.js/npm (for client)
+- Node.js/npm/bun (for client)
 - mkcert (for local SSL certificates)
 
 ### 1. Setup SSL Certificates with mkcert
