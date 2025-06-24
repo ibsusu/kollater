@@ -7,23 +7,62 @@ A browser-based peer-to-peer file sharing application utilizing WebRTC mesh netw
 ### Prerequisites
 - Bun runtime (for servers)
 - Node.js/npm (for client)
-- OpenSSL (for certificates)
+- mkcert (for local SSL certificates)
 
-### 1. Start the Testbed
+### 1. Setup SSL Certificates with mkcert
+
+First, install and setup mkcert for local SSL certificates:
+
+```bash
+# Install mkcert (choose your platform)
+# macOS
+brew install mkcert
+
+# Linux
+curl -JLO "https://dl.filippo.io/mkcert/latest?for=linux/amd64"
+chmod +x mkcert-v*-linux-amd64
+sudo cp mkcert-v*-linux-amd64 /usr/local/bin/mkcert
+
+# Windows (using Chocolatey)
+choco install mkcert
+
+# Windows (using Scoop)
+scoop bucket add extras
+scoop install mkcert
+```
+
+Install the local CA and generate certificates:
+
+```bash
+# Install the local CA in the system trust store
+mkcert -install
+
+# Generate certificates for kollator.local and wildcard subdomain
+cd certs/
+mkcert kollator.local "*.kollator.local"
+
+# This creates:
+# - kollator.local+1.pem (certificate)
+# - kollator.local+1-key.pem (private key)
+```
+
+### 2. Start the Testbed
 ```bash
 # Start all components as binaries
 ./start-testbed.sh
 ```
 
-### 2. Check Status
+### 3. Check Status
 ```bash
 # Check if everything is running properly
 ./check-testbed.sh
 ```
 
-### 3. Access the Application
-- **Client App**: https://kollator.local:5173 (requires certificate trust)
-- **Signaling Server**: https://kollator.local:8000 (requires certificate trust)
+### 4. Access the Application
+- **Client App**: https://kollator.local:5173 (SSL certificate trusted via mkcert)
+- **Signaling Server**: https://kollator.local:8000 (SSL certificate trusted via mkcert)
+
+> **Note**: With mkcert properly installed, browsers will automatically trust the certificates without security warnings.
 
 ## Architecture
 
@@ -71,16 +110,65 @@ chunkStream.write(myData)
 ### Common Issues
 
 1. **Certificate Trust Issues**
+   
+   If you're seeing SSL certificate warnings, ensure mkcert is properly installed:
+   
    ```bash
-   # Add certificate to browser trust store
+   # Check if mkcert CA is installed
+   mkcert -CAROOT
+   
+   # If not installed, install the local CA
+   mkcert -install
+   
+   # Regenerate certificates if needed
+   cd certs/
+   mkcert kollator.local "*.kollator.local"
+   ```
+   
+   **Manual Certificate Trust (if mkcert doesn't work):**
+   ```bash
    # Chrome: Settings > Privacy > Manage Certificates > Authorities
    # Import: certs/_wildcard.kollator.local+3.pem
+   
+   # Firefox: Settings > Privacy & Security > Certificates > View Certificates
+   # Import the certificate under "Authorities" tab
+   
+   # Safari: Double-click the certificate file and add to Keychain
+   # Set trust to "Always Trust" in Keychain Access
    ```
 
 2. **DNS Resolution**
    ```bash
-   # Ensure kollator.local resolves
+   # Ensure kollator.local resolves (done automatically by start-testbed.sh)
    echo "127.0.0.1 kollator.local" | sudo tee -a /etc/hosts
+   ```
+
+3. **mkcert Installation Issues**
+   
+   **macOS**: If Homebrew installation fails:
+   ```bash
+   # Alternative installation via direct download
+   curl -JLO "https://dl.filippo.io/mkcert/latest?for=darwin/amd64"
+   chmod +x mkcert-v*-darwin-amd64
+   sudo mv mkcert-v*-darwin-amd64 /usr/local/bin/mkcert
+   ```
+   
+   **Linux**: If you don't have sudo access:
+   ```bash
+   # Install to user directory
+   mkdir -p ~/.local/bin
+   curl -JLO "https://dl.filippo.io/mkcert/latest?for=linux/amd64"
+   chmod +x mkcert-v*-linux-amd64
+   mv mkcert-v*-linux-amd64 ~/.local/bin/mkcert
+   export PATH="$HOME/.local/bin:$PATH"
+   ```
+   
+   **Windows**: If package managers aren't available:
+   ```bash
+   # Download from GitHub releases
+   # Visit: https://github.com/FiloSottile/mkcert/releases
+   # Download mkcert-v*-windows-amd64.exe
+   # Rename to mkcert.exe and add to PATH
    ```
 
 3. **Port Conflicts**
