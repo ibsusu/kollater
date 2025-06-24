@@ -2,27 +2,13 @@
 
 A browser-based peer-to-peer file sharing application utilizing WebRTC mesh networking and BitTorrent v2 protocol with custom extensions.
 
-## Quick Start (Testbed)
+## Quick Start (Demo)
 
 ### Prerequisites
-- Bun runtime (for servers)
 - Node.js/npm (for client)
 - mkcert (for local SSL certificates)
-- Git (for submodule initialization)
 
-### 1. Initialize Git Submodules
-
-The project uses git submodules for node-datachannel dependencies. Initialize them first:
-
-```bash
-# Clone the repository with submodules
-git clone --recursive <repository-url>
-
-# Or if you already cloned without --recursive, initialize submodules:
-git submodule update --init --recursive
-```
-
-### 2. Setup SSL Certificates with mkcert
+### 1. Setup SSL Certificates with mkcert
 
 First, install and setup mkcert for local SSL certificates:
 
@@ -59,23 +45,39 @@ mkcert kollator.local "*.kollator.local"
 # - kollator.local+1-key.pem (private key)
 ```
 
-### 3. Start the Testbed
+### 2. Start the Demo
 ```bash
-# Start all components as binaries
+# Start the client demo (backend services disabled for demo)
 ./start-testbed.sh
 ```
 
-### 4. Check Status
+### 3. Access the Application
+- **Client Demo**: https://kollator.local:5173 (SSL certificate trusted via mkcert)
+
+> **Note**: This demo runs only the client application. Backend services (signaling server, worker, MinIO) are disabled for demonstration purposes.
+
+## Full Development Setup
+
+For full development with backend services, you'll need additional prerequisites:
+
+### Additional Prerequisites (Full Setup)
+- Bun runtime (for servers)
+- Git (for submodule initialization)
+- Docker & Docker Compose (for MinIO S3 storage)
+
+### Initialize Git Submodules (Full Setup)
+
+The project uses git submodules for node-datachannel dependencies:
+
 ```bash
-# Check if everything is running properly
-./check-testbed.sh
+# Clone the repository with submodules
+git clone --recursive <repository-url>
+
+# Or if you already cloned without --recursive, initialize submodules:
+git submodule update --init --recursive
 ```
 
-### 5. Access the Application
-- **Client App**: https://kollator.local:5173 (SSL certificate trusted via mkcert)
-- **Signaling Server**: https://kollator.local:8000 (SSL certificate trusted via mkcert)
-
-> **Note**: With mkcert properly installed, browsers will automatically trust the certificates without security warnings.
+To enable backend services, uncomment the relevant sections in `start-testbed.sh`.
 
 ## Architecture
 
@@ -211,13 +213,19 @@ chunkStream.write(myData)
    ```
 
 ### Logs
-All logs are stored in the `logs/` directory:
-- `signaling.log` - Front server logs
-- `worker1.log` - Worker server logs  
+Logs are stored in the `logs/` directory:
 - `client.log` - Client dev server logs
 
-### Manual Startup
-If the startup script doesn't work, start components manually:
+### Manual Startup (Demo)
+If the startup script doesn't work, start the client manually:
+
+```bash
+# Start client dev server
+cd client && npm run dev
+```
+
+### Manual Startup (Full Development)
+For full development with backend services, start components manually:
 
 ```bash
 # Terminal 1: Signaling Server
